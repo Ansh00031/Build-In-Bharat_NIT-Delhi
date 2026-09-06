@@ -45,6 +45,13 @@ from core.autostart import (
     is_autostart_enabled,
     read_startup_log,
 )
+from core.blockchain import (
+    FAUCET_URL,
+    LORA_BASE_URL,
+    anchor_session_on_chain,
+    get_or_create_wallet,
+    get_wallet_balance,
+)
 from core.collector import gather_system_context
 from core.config import settings
 from core.executor import execute_diagnostic_command
@@ -72,7 +79,10 @@ from core.snapshot import (
 )
 from core.ui import (
     console,
+    print_active_and_solved_issues,
     print_banner,
+    print_blockchain_anchor_card,
+    print_blockchain_status,
     print_command_execution,
     print_context_summary,
     print_diagnostic_commands,
@@ -84,7 +94,6 @@ from core.ui import (
     print_resume_header,
     print_rollback_proposal,
     print_root_cause_analysis,
-    print_active_and_solved_issues,
     print_sessions_history,
     print_status_summary,
 )
@@ -126,6 +135,12 @@ def diagnose(
         "--print-json",
         "-j",
         help="Print the raw collected JSON context payload to terminal.",
+    ),
+    anchor_chain: bool = typer.Option(
+        False,
+        "--anchor",
+        "-a",
+        help="Anchor cryptographic proof of diagnosis and remediation to Algorand TestNet (AlgoKit Lora Explorer).",
     ),
 ) -> None:
     """Run autonomous multi-step diagnostic, remediation, and snapshot pipeline."""
@@ -327,6 +342,21 @@ def diagnose(
     update_session_status(session_id, final_report_data.get("status", "COMPLETED"))
 
     print_final_report(final_report_data)
+
+    # Optional On-Chain Blockchain Audit Anchor (Algorand TestNet & AlgoKit Lora)
+    if anchor_chain:
+        with console.status(
+            "[bold magenta]Anchoring cryptographic repair proof to Algorand TestNet...[/bold magenta]",
+            spinner="dots",
+        ) as status:
+            anchor_res = anchor_session_on_chain(
+                session_id=session_id,
+                error_code=error_code,
+                status=final_report_data.get("status", "COMPLETED"),
+                fix_title=fix_proposal.get("title", "Remediation Script"),
+            )
+            status.update("[bold green]On-chain proof confirmed on Algorand TestNet![/bold green]")
+        print_blockchain_anchor_card(anchor_res)
 
     # Check if a reboot is required or pending
     reboot_needed = fix_proposal.get("requires_reboot", False) or is_reboot_pending()
@@ -657,6 +687,67 @@ def check_env() -> None:
     )
 
     console.print(table)
+
+
+# ==============================================================================
+# Algorand TestNet & AlgoKit Lora Explorer CLI Commands
+# ==============================================================================
+blockchain_app = typer.Typer(
+    name="blockchain",
+    help="Algorand TestNet & AlgoKit Lora on-chain audit manager.",
+    add_completion=False,
+    no_args_is_help=True,
+)
+
+
+@blockchain_app.command(name="status")
+def blockchain_status_cmd() -> None:
+    """View your Algorand TestNet wallet, balance, and AlgoKit Lora Explorer profile."""
+    print_banner()
+    address, _, is_new = get_or_create_wallet()
+    balance_info = get_wallet_balance(address)
+    balance_info["address"] = address
+    balance_info["is_new"] = is_new
+    balance_info["lora_url"] = f"{LORA_BASE_URL}/account/{address}"
+    balance_info["faucet_url"] = FAUCET_URL
+    print_blockchain_status(balance_info)
+
+
+@blockchain_app.command(name="anchor")
+def blockchain_anchor_cmd(
+    session_id: Optional[str] = typer.Argument(
+        None,
+        help="Session ID to anchor on Algorand TestNet (e.g. 'session_20260818_...'). If omitted, uses latest.",
+    ),
+) -> None:
+    """Commit an immutable cryptographic SHA-256 audit proof of a session to Algorand TestNet."""
+    print_banner()
+    sessions = list_sessions()
+    if not sessions:
+        console.print("[yellow]No historical remediation sessions found to anchor.[/yellow]")
+        raise typer.Exit(code=0)
+
+    if not session_id:
+        session_id = sessions[0]["session_id"]
+        console.print(f"[dim]Anchoring latest session: [cyan]{session_id}[/cyan][/dim]\n")
+
+    session_data = get_session(session_id) or {}
+    with console.status(
+        f"[bold magenta]Anchoring session '{session_id}' to Algorand TestNet (AlgoKit Lora)...[/bold magenta]",
+        spinner="dots",
+    ) as status:
+        res = anchor_session_on_chain(
+            session_id=session_id,
+            error_code=session_data.get("error_code", "OS_ERROR"),
+            status=session_data.get("status", "COMPLETED"),
+            fix_title=session_data.get("fix_title", "Remediation Script"),
+        )
+        status.update("[bold green]Anchoring process completed![/bold green]")
+
+    print_blockchain_anchor_card(res)
+
+
+app.add_typer(blockchain_app, name="blockchain")
 
 
 if __name__ == "__main__":

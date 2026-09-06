@@ -258,7 +258,7 @@ def create_deck(output_path: str = "Build_With_Bharat_Final_Presentation.pptx"):
         ("Core CLI & UI", ["Python 3.10+", "Typer (Type-safe CLI)", "Rich (Banners, Tables, Monokai Highlighting)"]),
         ("AI & Reasoning Engine", ["OpenAI API (GPT-4o)", "Ollama (Local Llama 3.1 / Mistral)", "Strict JSON Schema Prompts"]),
         ("OS & System Diagnostics", ["PowerShell 5.1 / 7+", "Windows Event Viewer (Get-WinEvent)", "WMI / Win32 System APIs"]),
-        ("Security & Safety Guardrails", ["Regex Command Blacklist (del/format/etc.)", "Temp File Sandbox & Auto-Cleanup", "Snapshot & Rollback Engine (.backups/)", "Windows RunOnce Post-Reboot Hook"]),
+        ("Security, Safety & Blockchain", ["Regex Command Blacklist & Sandbox", "Snapshot & 1-Click Rollback Engine", "Windows RunOnce Post-Reboot Hook", "Algorand TestNet & AlgoKit Lora Audit"]),
     ]
     for i, (cat, items) in enumerate(stack_cards):
         col = i % 2

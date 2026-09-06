@@ -8,6 +8,7 @@
 [![CLI](https://img.shields.io/badge/CLI-Typer%20%7C%20Rich-green.svg)](https://typer.tiangolo.com/)
 [![LLM Backend](https://img.shields.io/badge/LLM-OpenAI%20%7C%20Ollama%20%7C%20vLLM-purple.svg)](https://platform.openai.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Blockchain](https://img.shields.io/badge/Blockchain-Algorand%20TestNet%20%7C%20AlgoKit%20Lora-teal.svg)](https://lora.algokit.io/testnet)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
 </div>
@@ -33,6 +34,7 @@ The **Autonomous OS Debugging Agent** is a local Python CLI tool that automates 
 - 👨‍💻 **Human-in-the-Loop Approval**: Renders proposed PowerShell fixes in the terminal with full syntax highlighting (`Monokai` theme) before requesting explicit user consent (`[y/N]`).
 - ⚡ **Isolated Execution & Auto-Cleanup**: Executes approved fixes via temporary script files with guaranteed lifecycle cleanup.
 - 🔄 **Pre-Fix Snapshot & One-Click Rollback**: Automatically captures system state prior to remediation, allowing users to revert any change via `python agent.py rollback`.
+- 🔗 **Immutable On-Chain Audit Proofs**: Anchors cryptographic SHA-256 digests of every diagnosis & fix to **Algorand TestNet**, verified live on **[AlgoKit Lora Explorer](https://lora.algokit.io/testnet)**.
 - 🌐 **Model Agnostic**: Works seamlessly with cloud providers (OpenAI GPT-4o) or 100% private local LLMs via **Ollama** (`llama3.1`, `mistral`, `deepseek-coder`).
 
 ---
@@ -221,7 +223,26 @@ python agent.py disable-autostart
 
 ---
 
-### 6. Check Environment & Security Status
+### 6. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
+
+View your Algorand TestNet wallet, balance, and explorer profile:
+
+```powershell
+# View wallet address, balance, and AlgoKit Lora link:
+python agent.py blockchain status
+
+# Anchor a previous fix to Algorand TestNet with SHA-256 cryptographic proof:
+python agent.py blockchain anchor session_20260817_195408_80070005
+
+# Automatically anchor during diagnosis:
+python agent.py diagnose 0x80070005 --skip-admin-check --anchor
+```
+
+> **Explorer Link:** Live transactions are instantly verified at `https://lora.algokit.io/testnet/transaction/<TX_ID>`.
+
+---
+
+### 7. Check Environment & Security Status
 
 ```powershell
 python agent.py check-env

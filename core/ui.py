@@ -524,3 +524,84 @@ def print_active_and_solved_issues(
         )
     )
     console.print()
+
+
+def print_blockchain_anchor_card(result: dict) -> None:
+    """Print the Algorand TestNet on-chain anchor receipt with AlgoKit Lora Explorer links."""
+    if not result.get("success", False):
+        error_msg = result.get("error", "Unknown error")
+        address = result.get("address", "")
+        faucet_url = result.get("faucet_url", "")
+        lora_account = result.get("lora_account_url", "")
+
+        content = f"[bold red]✗ Blockchain Anchor Incomplete[/bold red]\n\n{error_msg}\n"
+        if address:
+            content += f"\n[bold white]Your TestNet Address:[/bold white]\n[cyan]{address}[/cyan]\n"
+        if lora_account:
+            content += f"\n[bold white]View on AlgoKit Lora Explorer:[/bold white]\n[dim underline cyan]{lora_account}[/dim underline cyan]\n"
+        if faucet_url:
+            content += f"\n[bold yellow]Get Free TestNet ALGO from Dispenser:[/bold yellow]\n[underline yellow]{faucet_url}[/underline yellow]\n"
+
+        console.print(
+            Panel(
+                content.strip(),
+                title="[bold yellow]Algorand TestNet Audit Anchor[/bold yellow]",
+                border_style="yellow",
+            )
+        )
+        console.print()
+        return
+
+    tx_id = result.get("tx_id", "")
+    lora_tx_url = result.get("lora_tx_url", "")
+    address = result.get("address", "")
+    round_num = result.get("confirmed_round", "")
+    digest = result.get("sha256", "")
+
+    content = (
+        f"[bold green]✓ Immutable On-Chain Audit Proof Confirmed![/bold green]\n\n"
+        f"[bold white]Algorand TestNet Round:[/bold white] [green]{round_num}[/green]\n"
+        f"[bold white]Transaction ID:[/bold white] [bold cyan]{tx_id}[/bold cyan]\n"
+        f"[bold white]Signer Address:[/bold white] [dim]{address}[/dim]\n"
+        f"[bold white]Session SHA-256 Digest:[/bold white] [yellow]{digest}[/yellow]\n\n"
+        f"───────────────────────────────────────────────────────────────────────────────\n"
+        f"[bold magenta]🔗 View Live On-Chain Proof on AlgoKit Lora Explorer:[/bold magenta]\n"
+        f"[bold underline cyan]{lora_tx_url}[/bold underline cyan]\n"
+        f"[dim]Timestamp, session ID, error code, and repair hash are permanently sealed on Algorand TestNet.[/dim]"
+    )
+
+    console.print(
+        Panel(
+            content.strip(),
+            title="[bold magenta]Algorand TestNet Audit Anchor (AlgoKit Lora)[/bold magenta]",
+            border_style="magenta",
+        )
+    )
+    console.print()
+
+
+def print_blockchain_status(wallet_info: dict) -> None:
+    """Print Algorand TestNet wallet status and Lora Explorer links."""
+    address = wallet_info.get("address", "")
+    balance = wallet_info.get("balance_algo", 0.0)
+    lora_url = wallet_info.get("lora_url", "")
+    faucet_url = wallet_info.get("faucet_url", "")
+    is_new = wallet_info.get("is_new", False)
+
+    content = f"[bold cyan]Network:[/bold cyan] Algorand TestNet (Algod Node: testnet-api.algonode.cloud)\n\n"
+    content += f"[bold white]Wallet Address:[/bold white]\n[bold cyan]{address}[/bold cyan]\n\n"
+    content += f"[bold white]TestNet Balance:[/bold white] [bold green]{balance:.4f} ALGO[/bold green]\n\n"
+    content += f"[bold magenta]AlgoKit Lora Account Explorer:[/bold magenta]\n[underline cyan]{lora_url}[/underline cyan]\n\n"
+    content += f"[bold yellow]Free TestNet Dispenser / Faucet:[/bold yellow]\n[underline yellow]{faucet_url}[/underline yellow]\n"
+
+    if is_new:
+        content += "\n[bold green]★ Newly Generated Account:[/bold green] Seed saved to '.backups/algorand_wallet.json'.\n"
+
+    console.print(
+        Panel(
+            content.strip(),
+            title="[bold magenta]Algorand TestNet & AlgoKit Lora Wallet[/bold magenta]",
+            border_style="magenta",
+        )
+    )
+    console.print()
