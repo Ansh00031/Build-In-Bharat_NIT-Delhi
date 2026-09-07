@@ -45,13 +45,23 @@ from core.autostart import (
     is_autostart_enabled,
     read_startup_log,
 )
-from core.blockchain import (
-    FAUCET_URL,
-    LORA_BASE_URL,
-    anchor_session_on_chain,
-    get_or_create_wallet,
-    get_wallet_balance,
-)
+try:
+    from core.blockchain import (
+        FAUCET_URL,
+        LORA_BASE_URL,
+        anchor_session_on_chain,
+        get_or_create_wallet,
+        get_wallet_balance,
+    )
+except ImportError:
+    FAUCET_URL = "https://bank.testnet.algorand.network"
+    LORA_BASE_URL = "https://lora.algokit.io/testnet"
+    def anchor_session_on_chain(*args, **kwargs):
+        return {"success": False, "error": "Blockchain module not available"}
+    def get_or_create_wallet(*args, **kwargs):
+        return ("NONE", "", False)
+    def get_wallet_balance(*args, **kwargs):
+        return {"balance_algo": 0.0, "status": "Offline"}
 from core.collector import gather_system_context
 from core.config import settings
 from core.executor import execute_diagnostic_command

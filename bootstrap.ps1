@@ -85,6 +85,7 @@ $coreFiles = @(
     "core/system_paths.py",
     "core/reboot_manager.py",
     "core/autostart.py",
+    "core/blockchain.py",
     "core/ui.py"
 )
 
