@@ -135,19 +135,49 @@ def print_context_summary(context: dict) -> None:
 
 
 def print_initial_diagnosis(data: dict) -> None:
-    """Print the AI initial diagnostic assessment with highlighted problem statement."""
+    """Print the AI initial diagnostic assessment with threat severity and device harm analysis."""
     error_code = data.get("error_code", "Unknown")
     error_name = data.get("error_name", "SYSTEM_ERROR")
     problem = data.get("problem_statement") or data.get("diagnosis", "No diagnosis provided.")
     likely_causes = data.get("likely_causes", [])
+    threat_level = data.get("threat_level", "HIGH (Threat Level 4/5)")
+    device_harm = data.get("device_harm", [])
+    consequences = data.get("consequence_if_unfixed")
 
-    content = f"[bold yellow]{error_code}[/bold yellow] - [bold cyan]{error_name}[/bold cyan]\n\n"
+    # Determine Threat Level badge color
+    t_upper = str(threat_level).upper()
+    if "CRITICAL" in t_upper or "5/5" in t_upper:
+        threat_badge = f"[bold red]🔴 {threat_level}[/bold red]"
+        box_color = "red"
+    elif "HIGH" in t_upper or "4/5" in t_upper or "3.5" in t_upper:
+        threat_badge = f"[bold yellow]🟠 {threat_level}[/bold yellow]"
+        box_color = "yellow"
+    elif "MEDIUM" in t_upper or "3/5" in t_upper:
+        threat_badge = f"[bold yellow]🟡 {threat_level}[/bold yellow]"
+        box_color = "yellow"
+    else:
+        threat_badge = f"[bold green]🟢 {threat_level}[/bold green]"
+        box_color = "cyan"
+
+    content = f"[bold yellow]{error_code}[/bold yellow] - [bold cyan]{error_name}[/bold cyan]\n"
+    content += f"[bold white]Threat Severity Rating:[/bold white] {threat_badge}\n\n"
     content += f"[bold red]► PROBLEM FACING SYSTEM:[/bold red]\n[bold white]{problem}[/bold white]\n"
 
+    if device_harm:
+        content += "\n[bold red]⚠️ HOW THIS ERROR HARMS YOUR LAPTOP / SYSTEM:[/bold red]\n"
+        if isinstance(device_harm, list):
+            for h in device_harm:
+                content += f"  [bold red]•[/bold red] [white]{h}[/white]\n"
+        else:
+            content += f"  [white]{device_harm}[/white]\n"
+
+    if consequences:
+        content += f"\n[bold yellow]► RISK IF LEFT UNFIXED:[/bold yellow]\n[dim white]{consequences}[/dim white]\n"
+
     if likely_causes:
-        content += "\n[bold]Suspected Root Causes:[/bold]\n"
+        content += "\n[bold cyan]► Suspected Root Causes:[/bold cyan]\n"
         for cause in likely_causes:
-            content += f" • [dim white]{cause}[/dim white]\n"
+            content += f"  • [dim white]{cause}[/dim white]\n"
 
     warning = data.get("llm_warning")
     if warning:
@@ -156,8 +186,8 @@ def print_initial_diagnosis(data: dict) -> None:
     console.print(
         Panel(
             content.strip(),
-            title="[bold green]AI Diagnostic Assessment & Problem Statement[/bold green]",
-            border_style="green",
+            title="[bold red]🛡️ AI Diagnostic Assessment & Security Threat Analysis[/bold red]",
+            border_style=box_color,
         )
     )
     console.print()
@@ -605,3 +635,94 @@ def print_blockchain_status(wallet_info: dict) -> None:
         )
     )
     console.print()
+
+
+def print_resolved_issues_table(issues: List[Dict[str, Any]], archive_path: Optional[str] = None) -> None:
+    """Print clean formatted table of all solved and resolved issues loaded from archive file."""
+    table = Table(
+        title="[bold green]Archived Solved & Resolved Problems[/bold green]",
+        border_style="green",
+        header_style="bold green",
+    )
+    table.add_column("#", style="dim", width=4)
+    table.add_column("Error Code", style="bold yellow", width=14)
+    table.add_column("Remediation / Fix Applied", style="white")
+    table.add_column("Status", style="bold green", width=12)
+    table.add_column("Resolved At", style="cyan", width=20)
+    table.add_column("Session ID", style="dim cyan", width=34)
+
+    if not issues:
+        table.add_row("-", "-", "No resolved issues currently recorded in archive file.", "-", "-", "-")
+    else:
+        for idx, item in enumerate(issues, 1):
+            code = item.get("error_code", "UNKNOWN")
+            title = item.get("fix_title") or item.get("title", "System Repair")
+            st = item.get("status", "SOLVED")
+            resolved_at = str(item.get("resolved_at", item.get("created_at", "")))[:19]
+            sid = item.get("session_id", "")
+            table.add_row(str(idx), code, title, f"[bold green]{st}[/bold green]", resolved_at, sid)
+
+    console.print(table)
+    if archive_path:
+        console.print(f"[dim]📁 Saved to dedicated archive file: [cyan]{archive_path}[/cyan][/dim]\n")
+    else:
+        console.print()
+
+
+def print_full_checkup_header() -> None:
+    """Print banner for Full PC Security & System Checkup."""
+    content = (
+        "[bold white]⚡ FULL PC SECURITY & SYSTEM HEALTH DOCTOR ⚡[/bold white]\n\n"
+        "[cyan]1. System File & Binary Integrity Check[/cyan] (SFC / DISM / Kernel verification)\n"
+        "[cyan]2. Event Viewer Crash Log Audit[/cyan] (System, Application, WindowsUpdate, Security)\n"
+        "[cyan]3. Core Security & System Services Health[/cyan] (wuauserv, bits, cryptsvc, WinDefend)\n"
+        "[cyan]4. NTFS ACL & Permissions Audit[/cyan] (System folders & Update caches)\n"
+        "[cyan]5. Autonomous AI Auto-Heal Engine[/cyan] (Detects root cause & generates verified fix)"
+    )
+    console.print(
+        Panel(
+            content,
+            title="[bold green]🛡️ Complete Laptop Security & Health Scan[/bold green]",
+            border_style="green",
+        )
+    )
+    console.print()
+
+
+def print_interactive_menu() -> None:
+    """Print clear numbered interactive command selector menu."""
+    menu_table = Table(
+        title="[bold cyan]⚡ Autonomous OS Debugging Agent — Interactive Command Selector ⚡[/bold cyan]",
+        border_style="cyan",
+        header_style="bold magenta",
+        show_lines=True,
+    )
+    menu_table.add_column("No.", style="bold yellow", justify="center", width=6)
+    menu_table.add_column("Command Action", style="bold white", width=24)
+    menu_table.add_column("Category", style="cyan", width=18)
+    menu_table.add_column("Description", style="dim white")
+
+    options = [
+        ("1", "full-checkup", "🛡️ Security & Health", "Full PC security & system scan — finds errors & auto-heals with AI"),
+        ("2", "diagnose", "🔵 Targeted Diagnostic", "Diagnose a specific OS error code (e.g. 0x80070005, 0x80240020)"),
+        ("3", "rollback", "🛡️ Recovery Engine", "1-Click instant system rollback to pre-fix baseline snapshot"),
+        ("4", "solved-issues", "🟢 Archive & Audit", "Display all solved & resolved problems saved in separate archive file"),
+        ("5", "startup-monitor", "📊 Live Health Monitor", "Real-time active vs resolved issues and live OS services check"),
+        ("6", "resume", "🔄 Post-Reboot Wakeup", "Resume and verify diagnostic session after computer restart"),
+        ("7", "history", "📜 Session History", "View complete historical table of all diagnostic/fix sessions"),
+        ("8", "blockchain status", "🟣 Web3 / Algorand", "View Algorand TestNet wallet, balance, and AlgoKit Lora link"),
+        ("9", "blockchain anchor", "🟣 Web3 / Algorand", "Commit cryptographic SHA-256 proof of repair to blockchain"),
+        ("10", "check-env", "⚙️ System Config", "Verify environment, LLM configuration, and Administrator/root rights"),
+        ("11", "enable-autostart", "🚀 Startup Setup", "Register agent to automatically monitor system health on boot"),
+        ("12", "disable-autostart", "🚀 Startup Setup", "Remove automatic boot monitor from startup tasks"),
+        ("13", "startup-log", "📜 Boot History Log", "View timestamped log of all automatic startup health runs"),
+        ("14", "install-shortcut", "⚡ 1-Word 'fix' Cmd", "Install permanent 1-word 'fix' shortcut in Command Prompt (cmd)"),
+        ("0", "exit", "❌ Exit", "Exit interactive command menu"),
+    ]
+
+    for num, cmd, cat, desc in options:
+        menu_table.add_row(f"[bold yellow][{num}][/bold yellow]", f"[bold green]{cmd}[/bold green]", cat, desc)
+
+    console.print(menu_table)
+    console.print()
+

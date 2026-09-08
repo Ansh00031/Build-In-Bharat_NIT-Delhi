@@ -1,6 +1,7 @@
 """Secure script execution and temporary file lifecycle management for OS remediations."""
 
 import os
+import platform
 import subprocess
 import tempfile
 import time
@@ -13,7 +14,7 @@ from core.system_paths import find_powershell_executable, get_system_env
 def execute_remediation_script(
     script_content: str,
     script_type: str = "powershell",
-    timeout: int = 120,
+    timeout: int = 300,
 ) -> Dict[str, Any]:
     """Write remediation script to a secure temporary file, execute via subprocess, and guarantee cleanup.
 
@@ -40,8 +41,9 @@ def execute_remediation_script(
             temp_file.write(script_content)
             temp_file_path = temp_file.name
 
+        is_win = platform.system() == "Windows"
         # Build execution command
-        if script_type.lower() == "powershell":
+        if script_type.lower() == "powershell" and is_win:
             ps_exe = find_powershell_executable()
             cmd = [
                 ps_exe,
@@ -62,7 +64,7 @@ def execute_remediation_script(
             text=True,
             timeout=timeout,
             env=get_system_env(),
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if is_win else 0,
         )
 
         duration = round(time.time() - start_time, 2)

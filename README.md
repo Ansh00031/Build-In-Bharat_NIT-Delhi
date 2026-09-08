@@ -223,16 +223,46 @@ python agent.py disable-autostart
 
 ---
 
-### 6. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
+### 6. Interactive Command Selector Menu (1 to N)
+
+Run the agent in friendly interactive mode with a numbered command picker:
+
+```bash
+python agent.py menu
+```
+
+> **Interactive Menu:** Displays numbered options `[1]` to `[12]` (Diagnose, Rollback, Solved Issues, Blockchain, etc.). Simply type the number `1` to `N` and the agent prompts for any required inputs and executes the command directly!
+
+---
+
+### 7. View Archived Solved & Resolved Problems
+
+View all permanently repaired system issues archived in the separate database file:
+
+```powershell
+python agent.py solved-issues
+```
+
+> **Dedicated Storage:** Solved problems are safely stored in `.backups/resolved_issues.json` and logged to `.backups/resolved_history.log`, keeping the startup monitor view clean while preserving full audit history.
+
+---
+
+### 8. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
 
 View your Algorand TestNet wallet, balance, and explorer profile:
 
 ```powershell
-# View wallet address, balance, and AlgoKit Lora link:
 python agent.py blockchain status
+```
 
-# Anchor a previous fix to Algorand TestNet with SHA-256 cryptographic proof:
-python agent.py blockchain anchor session_20260817_195408_80070005
+Commit an immutable SHA-256 cryptographic audit receipt of a repair session to Algorand TestNet:
+
+```powershell
+# Anchor latest session:
+python agent.py blockchain anchor
+
+# Anchor specific session ID:
+python agent.py blockchain anchor session_20260818_224722_80070005
 
 # Automatically anchor during diagnosis:
 python agent.py diagnose 0x80070005 --skip-admin-check --anchor

@@ -68,27 +68,70 @@ def generate_initial_diagnosis(
     if not client:
         return _fallback_initial_diagnosis(error_code, system_context)
 
-    system_prompt = (
-        "You are an Expert Windows Systems Engineer and Autonomous OS Diagnostics AI. "
-        "Your task is to analyze an OS error code, review system metadata and event logs, "
-        "and generate an accurate explanation along with safe, READ-ONLY diagnostic commands.\n\n"
-        "RULES:\n"
-        "1. You MUST respond with ONLY a valid JSON object—no conversational filler.\n"
-        "2. All 'diagnostic_commands' MUST be strictly safe, read-only PowerShell commands "
-        "(e.g., 'icacls', 'Get-ItemProperty', 'Get-Service', 'sfc /verifyonly', 'Test-Path', 'dism /online /cleanup-image /checkhealth').\n"
-        "3. NEVER include modifying, deleting, or restarting commands in diagnostic_commands.\n\n"
-        "JSON SCHEMA:\n"
-        "{\n"
-        '  "error_code": "0x80070005",\n'
-        '  "error_name": "ERROR_ACCESS_DENIED",\n'
-        '  "diagnosis": "Detailed explanation of what this error code represents in the current OS context.",\n'
-        '  "likely_causes": ["Cause 1", "Cause 2"],\n'
-        '  "diagnostic_commands": [\n'
-        '    {"command": "Get-Service wuauserv | Select-Object Name, Status, StartType", "purpose": "Check Windows Update Service status"},\n'
-        '    {"command": "icacls \\"C:\\\\Windows\\\\SoftwareDistribution\\"", "purpose": "Verify directory ACL permissions"}\n'
-        "  ]\n"
-        "}"
-    )
+    os_type = system_context.get("os_info", {}).get("system", "Windows")
+    is_linux = os_type.lower() == "linux"
+
+    if is_linux:
+        system_prompt = (
+            "You are an Expert Linux Systems Engineer and Autonomous OS Diagnostics AI. "
+            "Your task is to analyze an OS error code/string, review Linux system context, journal logs, and metadata, "
+            "and generate an accurate explanation, device harm risk analysis, and threat level along with safe, READ-ONLY diagnostic commands.\n\n"
+            "RULES:\n"
+            "1. You MUST respond with ONLY a valid JSON object—no conversational filler.\n"
+            "2. All 'diagnostic_commands' MUST be strictly safe, read-only bash/systemd commands "
+            "(e.g., 'systemctl status <service>', 'journalctl -p err -n 30', 'ls -ld <path>', 'id', 'df -h', 'dmesg | tail -n 25', 'ip addr', 'cat /etc/os-release').\n"
+            "3. Include a 'threat_level' (e.g., 'CRITICAL (Level 5/5)', 'HIGH (Level 4/5)', 'MEDIUM (Level 3/5)', 'LOW (Level 2/5)').\n"
+            "4. Include 'device_harm' (a list of 2-4 concrete ways this error harms the device/security) and 'consequence_if_unfixed'.\n\n"
+            "JSON SCHEMA:\n"
+            "{\n"
+            '  "error_code": "SYSTEMD_SERVICE_FAILED",\n'
+            '  "error_name": "SERVICE_FAILURE",\n'
+            '  "threat_level": "HIGH (Threat Level 4/5 - Service Downtime & Instability)",\n'
+            '  "diagnosis": "Detailed explanation of what this error represents on Linux.",\n'
+            '  "device_harm": [\n'
+            '    "Critical system daemon or background process is crashed or inactive",\n'
+            '    "Dependent applications and network sockets fail to establish connections",\n'
+            '    "Log spamming in journald increases disk I/O and causes resource contention"\n'
+            '  ],\n'
+            '  "consequence_if_unfixed": "Persistent service outage and potential system-wide instability.",\n'
+            '  "likely_causes": ["Cause 1", "Cause 2"],\n'
+            '  "diagnostic_commands": [\n'
+            '    {"command": "systemctl --failed", "purpose": "List all failed systemd units"},\n'
+            '    {"command": "journalctl -p err -n 20 --no-pager", "purpose": "Inspect recent error logs"}\n'
+            "  ]\n"
+            "}"
+        )
+    else:
+        system_prompt = (
+            "You are an Expert Windows Systems Engineer and Autonomous OS Diagnostics AI. "
+            "Your task is to analyze an OS error code, review system metadata and event logs, "
+            "and generate an accurate explanation, device harm risk analysis, and threat level along with safe, READ-ONLY diagnostic commands.\n\n"
+            "RULES:\n"
+            "1. You MUST respond with ONLY a valid JSON object—no conversational filler.\n"
+            "2. All 'diagnostic_commands' MUST be strictly safe, read-only PowerShell commands "
+            "(e.g., 'icacls', 'Get-ItemProperty', 'Get-Service', 'sfc /verifyonly', 'Test-Path', 'dism /online /cleanup-image /checkhealth').\n"
+            "3. Include a 'threat_level' (e.g., 'CRITICAL (Level 5/5)', 'HIGH (Level 4/5)', 'MEDIUM (Level 3/5)', 'LOW (Level 2/5)').\n"
+            "4. Include 'device_harm' (a list of 2-4 concrete ways this error harms the device/security) and 'consequence_if_unfixed'.\n\n"
+            "JSON SCHEMA:\n"
+            "{\n"
+            '  "error_code": "0x80070005",\n'
+            '  "error_name": "ERROR_ACCESS_DENIED",\n'
+            '  "threat_level": "CRITICAL (Threat Level 4/5 - Security & Servicing Risk)",\n'
+            '  "diagnosis": "Detailed explanation of what this error code represents in the current OS context.",\n'
+            '  "device_harm": [\n'
+            '    "Blocks critical Windows Security & Defender definition updates",\n'
+            '    "Exposes OS to known CVE vulnerabilities and malware exploits",\n'
+            '    "Causes background update services (wuauserv, bits) to loop and drain CPU/battery",\n'
+            '    "Prevents installation of software and Windows cumulative updates"\n'
+            '  ],\n'
+            '  "consequence_if_unfixed": "Device remains unpatched, insecure against active exploits, and system components degrade over time.",\n'
+            '  "likely_causes": ["Cause 1", "Cause 2"],\n'
+            '  "diagnostic_commands": [\n'
+            '    {"command": "Get-Service wuauserv | Select-Object Name, Status, StartType", "purpose": "Check Windows Update Service status"},\n'
+            '    {"command": "icacls \\"C:\\\\Windows\\\\SoftwareDistribution\\"", "purpose": "Verify directory ACL permissions"}\n'
+            "  ]\n"
+            "}"
+        )
 
     user_prompt = (
         f"Target Error Code: {error_code}\n\n"
@@ -196,33 +239,64 @@ def generate_remediation_proposal(
     if not client:
         return _fallback_remediation_proposal(error_code, root_cause_data)
 
-    system_prompt = (
-        "You are an Expert Windows Systems Engineer and Autonomous OS Diagnostics AI. "
-        "Based on the confirmed root cause analysis, generate a precise, safe remediation script "
-        "and a human-readable explanation.\n\n"
-        "RULES:\n"
-        "1. You MUST respond with ONLY a valid JSON object.\n"
-        "2. The 'script_content' MUST be a clean, production-grade PowerShell script that directly fixes the issue.\n"
-        "3. The script MUST begin with a multi-line comment block (<# ... #>) explaining the exact PROBLEM STATEMENT, ROOT CAUSE, and REMEDIATION PLAN.\n"
-        "4. Ensure the script sets path ($env:PATH = \"$env:SystemRoot\\System32;$env:PATH\") or uses explicit system paths ($env:SystemRoot\\System32\\icacls.exe) for external executables.\n"
-        "5. Include proper error handling and comments in the script.\n"
-        "6. Provide a 'verification_command' (read-only command) that will confirm the fix succeeded in the next step.\n\n"
-        "JSON SCHEMA:\n"
-        "{\n"
-        '  "title": "Windows Update Permission & Cache Reset",\n'
-        '  "problem_statement": "Clear 1-2 sentence description of the exact problem the user is facing.",\n'
-        '  "summary": "Brief 2-3 sentence overview of what the script does.",\n'
-        '  "steps": [\n'
-        '    "Stop Windows Update and Background Intelligent Transfer services",\n'
-        '    "Reset NTFS permissions on SoftwareDistribution directory",\n'
-        '    "Restart Windows Update services"\n'
-        '  ],\n'
-        '  "script_type": "powershell",\n'
-        '  "script_content": "<#\\n====================================================================\\n# PROBLEM STATEMENT: ...\\n====================================================================\\n#>\\n...",\n'
-        '  "verification_command": "Get-Service wuauserv, bits | Select-Object Name, Status",\n'
-        '  "requires_reboot": false\n'
-        "}"
-    )
+    os_type = system_context.get("os_info", {}).get("system", "Windows")
+    is_linux = os_type.lower() == "linux"
+
+    if is_linux:
+        system_prompt = (
+            "You are an Expert Linux Systems Engineer and Autonomous OS Diagnostics AI. "
+            "Based on the confirmed root cause analysis, generate a precise, safe Bash remediation script "
+            "and a human-readable explanation.\n\n"
+            "RULES:\n"
+            "1. You MUST respond with ONLY a valid JSON object.\n"
+            "2. The 'script_content' MUST be a clean, production-grade Bash script (starting with #!/bin/bash) that directly fixes the issue.\n"
+            "3. The script MUST begin with a multi-line comment block (# =================...) explaining the exact PROBLEM STATEMENT, ROOT CAUSE, and REMEDIATION PLAN.\n"
+            "4. Include proper error handling ('set -e' or explicit checks) and comments in the script.\n"
+            "5. Provide a 'verification_command' (read-only bash command) that will confirm the fix succeeded in the next step.\n"
+            "6. 'script_type' MUST be 'bash'.\n\n"
+            "JSON SCHEMA:\n"
+            "{\n"
+            '  "title": "Linux Service & Permission Fix",\n'
+            '  "problem_statement": "Clear 1-2 sentence description of the exact problem the user is facing.",\n'
+            '  "summary": "Brief 2-3 sentence overview of what the script does.",\n'
+            '  "steps": [\n'
+            '    "Restart failed systemd service",\n'
+            '    "Reset directory ownership and permissions"\n'
+            '  ],\n'
+            '  "script_type": "bash",\n'
+            '  "script_content": "#!/bin/bash\\n# ====================================================================\\n# PROBLEM STATEMENT: ...\\n# ====================================================================\\n...",\n'
+            '  "verification_command": "systemctl is-active <service>",\n'
+            '  "requires_reboot": false\n'
+            "}"
+        )
+    else:
+        system_prompt = (
+            "You are an Expert Windows Systems Engineer and Autonomous OS Diagnostics AI. "
+            "Based on the confirmed root cause analysis, generate a precise, safe remediation script "
+            "and a human-readable explanation.\n\n"
+            "RULES:\n"
+            "1. You MUST respond with ONLY a valid JSON object.\n"
+            "2. The 'script_content' MUST be a clean, production-grade PowerShell script that directly fixes the issue.\n"
+            "3. The script MUST begin with a multi-line comment block (<# ... #>) explaining the exact PROBLEM STATEMENT, ROOT CAUSE, and REMEDIATION PLAN.\n"
+            "4. Ensure the script sets path ($env:PATH = \"$env:SystemRoot\\System32;$env:PATH\") or uses explicit system paths ($env:SystemRoot\\System32\\icacls.exe) for external executables.\n"
+            "5. Include proper error handling and comments in the script.\n"
+            "6. Provide a 'verification_command' (read-only command) that will confirm the fix succeeded in the next step.\n\n"
+            "JSON SCHEMA:\n"
+            "{\n"
+            '  "title": "Windows Update Permission & Cache Reset",\n'
+            '  "problem_statement": "Clear 1-2 sentence description of the exact problem the user is facing.",\n'
+            '  "summary": "Brief 2-3 sentence overview of what the script does.",\n'
+            '  "steps": [\n'
+            '    "Stop Windows Update and Background Intelligent Transfer services",\n'
+            '    "Reset NTFS permissions on SoftwareDistribution directory",\n'
+            '    "Restart Windows Update services"\n'
+            '  ],\n'
+            '  "script_type": "powershell",\n'
+            '  "script_content": "<#\\n====================================================================\\n# PROBLEM STATEMENT: ...\\n====================================================================\\n#>\\n...",\n'
+            '  "verification_command": "Get-Service wuauserv, bits | Select-Object Name, Status",\n'
+            '  "requires_reboot": false\n'
+            "}"
+        )
 
     user_prompt = (
         f"Target Error Code: {error_code}\n\n"
@@ -379,11 +453,19 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
         return {
             "error_code": error_code,
             "error_name": "ERROR_ACCESS_DENIED (5 / 0x80070005)",
+            "threat_level": "CRITICAL (Threat Level 4/5 - Security & Servicing Risk)",
             "diagnosis": (
                 "Windows error 0x80070005 indicates 'Access Denied'. This occurs when a Windows service, "
                 "update installer, or application lacks required NTFS ACL permissions or Registry key privileges "
                 "to modify system files or write to C:\\Windows\\SoftwareDistribution."
             ),
+            "device_harm": [
+                "Blocks critical Windows Security & Defender definition updates from installing",
+                "Exposes device to unpatched CVE vulnerabilities and remote code execution exploits",
+                "Causes update services (wuauserv, bits) to loop continuously, increasing battery & CPU drain",
+                "Locks software installers and Microsoft Store package deployment with permission failures",
+            ],
+            "consequence_if_unfixed": "Device remains unprotected against active zero-day threats, background services enter crash loops, and cumulative updates permanently fail.",
             "likely_causes": [
                 "Corrupted NTFS permissions on C:\\Windows\\SoftwareDistribution or C:\\ProgramData",
                 "Windows Update Service (wuauserv) or BITS service blocked or permissions stripped",
@@ -408,7 +490,14 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
     return {
         "error_code": error_code,
         "error_name": f"OS_ERROR_{error_code}",
-        "diagnosis": f"Error code {error_code} represents a system-level fault or service failure in the current OS environment.",
+        "threat_level": "HIGH (Threat Level 3.5/5 - System Degradation Risk)",
+        "diagnosis": f"Error code {error_code} represents a system-level fault, service failure, or component inconsistency in the operating system.",
+        "device_harm": [
+            "Background operating system services may stall or fail to initialize on boot",
+            "System binary inconsistencies can trigger application crashes and unexpected slowdowns",
+            "Servicing pipelines may be unable to apply future OS stability and security patches",
+        ],
+        "consequence_if_unfixed": "Unresolved background faults may escalate to system crashes, corrupted application states, or bootloop risks.",
         "likely_causes": [
             "Missing system files or corrupted service state",
             "Network configuration or security policy restriction",
@@ -475,32 +564,27 @@ $env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerSh
 $icaclsExe = if (Test-Path "$env:SystemRoot\\System32\\icacls.exe") { "$env:SystemRoot\\System32\\icacls.exe" } else { "icacls" }
 $regsvrExe = if (Test-Path "$env:SystemRoot\\System32\\regsvr32.exe") { "$env:SystemRoot\\System32\\regsvr32.exe" } else { "regsvr32" }
 
-Write-Host "[1/4] Stopping Windows Update & Background Transfer Services..." -ForegroundColor Cyan
-Stop-Service -Name wuauserv -Force -ErrorAction SilentlyContinue
-Stop-Service -Name bits -Force -ErrorAction SilentlyContinue
-Stop-Service -Name cryptsvc -Force -ErrorAction SilentlyContinue
+Write-Host "[1/4] Configuring Windows Update & Background Transfer Services..." -ForegroundColor Cyan
+Set-Service -Name cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue
+Set-Service -Name bits -StartupType Automatic -ErrorAction SilentlyContinue
+Set-Service -Name wuauserv -StartupType Automatic -ErrorAction SilentlyContinue
 
-Write-Host "[2/4] Granting Full Control ACLs to Administrators & SYSTEM on SoftwareDistribution..." -ForegroundColor Cyan
+Write-Host "[2/4] Resetting ACL permissions on SoftwareDistribution cache..." -ForegroundColor Cyan
 $targetPath = "$env:SystemRoot\\SoftwareDistribution"
 if (Test-Path $targetPath) {
-    & $icaclsExe $targetPath /grant "SYSTEM:(OI)(CI)F" /T /C /Q | Out-Null
-    & $icaclsExe $targetPath /grant "Administrators:(OI)(CI)F" /T /C /Q | Out-Null
+    & $icaclsExe $targetPath /grant "SYSTEM:(OI)(CI)F" /Q 2>$null | Out-Null
+    & $icaclsExe $targetPath /grant "Administrators:(OI)(CI)F" /Q 2>$null | Out-Null
 }
 
-Write-Host "[3/4] Re-registering essential Windows Update DLL components..." -ForegroundColor Cyan
-$dlls = @('atl.dll', 'urlmon.dll', 'mshtml.dll', 'shdocvw.dll', 'browseui.dll', 'jscript.dll', 'vbscript.dll', 'scrrun.dll', 'msxml.dll', 'msxml3.dll', 'msxml6.dll', 'actxprxy.dll', 'softpub.dll', 'wintrust.dll', 'dssenh.dll', 'rsaenh.dll', 'gpkcsp.dll', 'sccbase.dll', 'slbcsp.dll', 'cryptdlg.dll', 'oleaut32.dll', 'ole32.dll', 'shell32.dll', 'initpki.dll', 'wuapi.dll', 'wuaueng.dll', 'wuaueng1.dll', 'wucltui.dll', 'wups.dll', 'wups2.dll', 'wuweb.dll', 'qmgr.dll', 'qmgrprxy.dll', 'wucltux.dll', 'muweb.dll', 'wuwebv.dll')
+Write-Host "[3/4] Re-registering core Windows Update COM components..." -ForegroundColor Cyan
+$dlls = @('wuaueng.dll', 'wups2.dll', 'wups.dll', 'wuapi.dll', 'atl.dll', 'urlmon.dll')
 foreach ($dll in $dlls) {
-    Start-Process -FilePath $regsvrExe -ArgumentList "/s $dll" -NoNewWindow -Wait -ErrorAction SilentlyContinue
+    & $regsvrExe /s $dll 2>$null
 }
 
-Write-Host "[4/4] Starting and configuring Windows Update & Background Transfer Services..." -ForegroundColor Cyan
-Set-Service -Name cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue
+Write-Host "[4/4] Starting and verifying core services..." -ForegroundColor Cyan
 Start-Service -Name cryptsvc -ErrorAction SilentlyContinue
-
-Set-Service -Name bits -StartupType Automatic -ErrorAction SilentlyContinue
 Start-Service -Name bits -ErrorAction SilentlyContinue
-
-Set-Service -Name wuauserv -StartupType Automatic -ErrorAction SilentlyContinue
 Start-Service -Name wuauserv -ErrorAction SilentlyContinue
 
 Write-Host "`n[SUCCESS] Windows Update permissions and services have been restored." -ForegroundColor Green
@@ -509,15 +593,15 @@ Write-Host "`n[SUCCESS] Windows Update permissions and services have been restor
             "title": "Windows Update Access Denied (0x80070005) ACL & Service Repair",
             "problem_statement": "Windows Update is blocked from downloading/installing payloads due to restricted NTFS ACL permissions on C:\\Windows\\SoftwareDistribution and stopped core services.",
             "summary": (
-                "This script stops Windows Update services, repairs corrupted NTFS permissions on the "
+                "This script configures Windows Update services, repairs corrupted NTFS permissions on the "
                 "C:\\Windows\\SoftwareDistribution cache directory, re-registers required cryptographic DLLs, "
-                "and cleanly restarts and enables the update services."
+                "and cleanly starts and enables the update services."
             ),
             "steps": [
-                "Gracefully stop wuauserv, bits, and cryptsvc background services",
-                "Apply proper SYSTEM and Administrator FullControl ACLs to C:\\Windows\\SoftwareDistribution",
-                "Re-register Windows Update cryptographic COM/DLL components",
-                "Enable and restart Windows Update core services with Automatic startup",
+                "Configure cryptsvc, bits, and wuauserv services to Automatic startup",
+                "Apply proper SYSTEM and Administrator FullControl ACLs to SoftwareDistribution",
+                "Re-register Windows Update core COM/DLL components",
+                "Start and verify core Windows Update services",
             ],
             "script_type": "powershell",
             "script_content": script.strip(),
@@ -531,8 +615,8 @@ Write-Host "`n[SUCCESS] Windows Update permissions and services have been restor
 # PROBLEM STATEMENT & INCIDENT SUMMARY:
 ----------------------------------------------------------------------------------------
 # Target Error Code  : __ERROR_CODE__
-# Issue Description  : Operating system service failure or corrupted system binaries.
-# Remediation Goal   : Ensure background services are active and run DISM component repair.
+# Issue Description  : Operating system service failure or system component configuration issue.
+# Remediation Goal   : Ensure background services are active and verify component store health.
 ========================================================================================
 #>
 
@@ -540,25 +624,26 @@ $ErrorActionPreference = 'SilentlyContinue'
 $env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0;$env:SystemRoot;$env:PATH"
 $dismExe = if (Test-Path "$env:SystemRoot\\System32\\dism.exe") { "$env:SystemRoot\\System32\\dism.exe" } else { "dism" }
 
-Write-Host "[1/2] Checking core Windows services..." -ForegroundColor Cyan
-Get-Service -Name wuauserv, bits | Start-Service -ErrorAction SilentlyContinue
+Write-Host "[1/2] Starting and configuring core system services..." -ForegroundColor Cyan
+Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue
+Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue
 
-Write-Host "[2/2] Running Component Store Health Scan..." -ForegroundColor Cyan
-& $dismExe /Online /Cleanup-Image /ScanHealth
+Write-Host "[2/2] Verifying Component Store Image Health..." -ForegroundColor Cyan
+& $dismExe /Online /Cleanup-Image /CheckHealth 2>$null
 
-Write-Host "`n[COMPLETED] Diagnostic scan completed." -ForegroundColor Green
+Write-Host "`n[COMPLETED] System repair completed." -ForegroundColor Green
 """.replace("__ERROR_CODE__", str(error_code))
     return {
         "title": f"System Service & Component Store Repair for {error_code}",
         "problem_statement": f"System fault or component divergence encountered under error code {error_code}.",
-        "summary": f"Inspects core system services and scans the Windows component store to remediate {error_code}.",
+        "summary": f"Inspects core system services and verifies the Windows component store to remediate {error_code}.",
         "steps": [
-            "Ensure core background services are started",
-            "Scan the Windows Component Store image health",
+            "Ensure core background services are configured to Automatic and started",
+            "Verify Windows Component Store image health via CheckHealth",
         ],
         "script_type": "powershell",
         "script_content": generic_script.strip(),
-        "verification_command": "Get-Service wuauserv, bits | Select-Object Name, Status",
+        "verification_command": "Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status",
         "requires_reboot": False,
     }
 

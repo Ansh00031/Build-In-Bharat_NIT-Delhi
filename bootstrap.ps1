@@ -20,13 +20,13 @@ Write-Host @"
 [+] Initializing live cloud recovery environment...
 "@ -ForegroundColor Cyan
 
-# 1. Determine Working Directory
-$targetDir = if ($env:TEMP) { "$env:TEMP\os-debug-agent" } else { "C:\os-debug-agent" }
+# 1. Determine Working Directory (Permanent User Directory)
+$targetDir = if ($env:USERPROFILE) { "$env:USERPROFILE\os-debug-agent" } elseif ($env:LOCALAPPDATA) { "$env:LOCALAPPDATA\os-debug-agent" } else { "C:\os-debug-agent" }
 if (!(Test-Path $targetDir)) {
     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 }
 Set-Location $targetDir
-Write-Host "[1/4] Recovery workspace set to: $targetDir" -ForegroundColor Green
+Write-Host "[1/4] Permanent user workspace set to: $targetDir" -ForegroundColor Green
 
 # 2. Check for Python on the machine or in internal drives (C:, D:, etc.)
 Write-Host "[2/4] Searching for Python runtime across system drives..." -ForegroundColor Cyan
@@ -70,8 +70,6 @@ if ($pythonExe) {
 Write-Host "[3/4] Fetching latest Autonomous OS Debugging Agent files from cloud..." -ForegroundColor Cyan
 
 # Default repository URL
-$rawBase = "https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main"
-
 $coreFiles = @(
     "agent.py",
     "core/__init__.py",
@@ -86,7 +84,8 @@ $coreFiles = @(
     "core/reboot_manager.py",
     "core/autostart.py",
     "core/blockchain.py",
-    "core/ui.py"
+    "core/ui.py",
+    "fix.bat"
 )
 
 # Create core directory
@@ -102,11 +101,21 @@ foreach ($f in $coreFiles) {
 }
 
 # Install minimal CLI dependencies
-Write-Host "`n[*] Installing required dependencies (typer, rich, pydantic, python-dotenv)..." -ForegroundColor Cyan
-& $pythonExe -m pip install typer rich pydantic python-dotenv --disable-pip-version-check
+Write-Host "`n[*] Installing required CLI dependencies..." -ForegroundColor Cyan
+& $pythonExe -m pip install typer rich pydantic python-dotenv --break-system-packages --disable-pip-version-check --quiet
 
-# 4. Launch the Autonomous Diagnostic Agent
-Write-Host "`n[4/4] 🚀 Launching Autonomous OS Debugging Agent..." -ForegroundColor Green
+# 4. Install permanent 1-word 'fix' shortcut across user & system PATH
+Write-Host "`n[4/4] ⚡ Registering permanent 1-word 'fix' emergency command..." -ForegroundColor Cyan
+try {
+    & $pythonExe "$targetDir\agent.py" install-shortcut | Out-Null
+    if (Test-Path "$targetDir\fix.bat") {
+        if ($env:USERPROFILE) { Copy-Item "$targetDir\fix.bat" "$env:USERPROFILE\fix.bat" -Force -ErrorAction SilentlyContinue }
+        if ($env:LOCALAPPDATA) { Copy-Item "$targetDir\fix.bat" "$env:LOCALAPPDATA\Microsoft\WindowsApps\fix.bat" -Force -ErrorAction SilentlyContinue }
+    }
+} catch {}
+
+# 5. Launch the Autonomous Diagnostic Agent
+Write-Host "`n🚀 Launching Autonomous OS Debugging Agent..." -ForegroundColor Green
 Write-Host "===============================================================================" -ForegroundColor Cyan
 
 & $pythonExe "$targetDir\agent.py" startup-monitor
@@ -114,9 +123,11 @@ Write-Host "====================================================================
 # Keep interactive shell ready
 Write-Host @"
 
-[✓] Rescue environment is live!
-You can now run:
-    python agent.py diagnose 0x80070005
-    python agent.py diagnose BOOT_LOOP
-===============================================================================
+[✓] Agent and 'fix' shortcut are permanently installed in user files ($targetDir)!
+You can now open ANY Command Prompt or PowerShell anytime and run:
+    fix                                  <-- ⚡ 1-Word Emergency Shortcut (Interactive Menu)
+    fix checkup                          <-- 🛡️ Full PC Security & System Health Scan
+    fix 0x80070005                       <-- 🔵 Diagnose specific error code
+    fix rollback                         <-- 🛡️ 1-Click instant system rollback
+==============================================================================="
 "@ -ForegroundColor Yellow

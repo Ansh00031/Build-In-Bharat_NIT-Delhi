@@ -1,5 +1,4 @@
-"""Safe read-only command executor for OS diagnostics."""
-
+import platform
 import re
 import subprocess
 import time
@@ -28,6 +27,16 @@ DANGEROUS_PATTERNS = [
     r"\breg\s+delete\b",
     r"\bshutdown\b",
     r"\brestart-computer\b",
+    # Linux destructive commands
+    r"\brm\s+-rf\b",
+    r"\bmkfs\b",
+    r"\bdd\s+if=\b",
+    r"\bchmod\s+-R\s+777\b",
+    r"\bchown\s+-R\b",
+    r"\bpoweroff\b",
+    r"\breboot\b",
+    r"\binit\s+0\b",
+    r":\(\)\s*\{\s*:\|:&\s*\};:",
 ]
 
 
@@ -52,7 +61,7 @@ def is_command_safe(command: str) -> Tuple[bool, str]:
 
 
 def execute_diagnostic_command(command: str, timeout: int = 30) -> Dict[str, Any]:
-    """Execute a read-only diagnostic command securely in PowerShell and capture output.
+    """Execute a read-only diagnostic command securely in PowerShell or Bash and capture output.
 
     Args:
         command: Command string to execute.
@@ -75,16 +84,21 @@ def execute_diagnostic_command(command: str, timeout: int = 30) -> Dict[str, Any
 
     start_time = time.time()
     try:
-        ps_exe = find_powershell_executable()
-        cmd = [
-            ps_exe,
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            command,
-        ]
+        is_win = platform.system() == "Windows"
+        if is_win:
+            ps_exe = find_powershell_executable()
+            cmd = [
+                ps_exe,
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ]
+        else:
+            # POSIX / Linux execution
+            cmd = ["bash", "-c", command]
 
         result = subprocess.run(
             cmd,
@@ -92,7 +106,7 @@ def execute_diagnostic_command(command: str, timeout: int = 30) -> Dict[str, Any
             text=True,
             timeout=timeout,
             env=get_system_env(),
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if is_win else 0,
         )
 
         duration = round(time.time() - start_time, 2)

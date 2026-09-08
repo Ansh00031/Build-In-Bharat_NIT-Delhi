@@ -98,7 +98,10 @@ pause
 """
         startup_bat.write_text(bat_content, encoding="utf-8")
 
-        return True, f"Auto-start enabled! Created clean single startup launcher: {startup_bat.name}"
+        # Also install the 1-word emergency 'fix' shortcut
+        install_fix_shortcut()
+
+        return True, f"Auto-start enabled! Created clean single startup launcher: {startup_bat.name} & installed 'fix' shortcut."
 
     except Exception as ex:
         return False, f"Failed to enable auto-start: {str(ex)}"
@@ -143,6 +146,284 @@ def disable_autostart() -> Tuple[bool, str]:
         return False, f"Failed to disable auto-start: {str(ex)}"
 
 
+def get_fix_shortcut_content() -> str:
+    """Return the content for the 1-word emergency shortcut script."""
+    if platform.system() == "Windows":
+        agent_dir = Path(__file__).resolve().parent.parent
+        return f"""@echo off
+setlocal enabledelayedexpansion
+
+title Autonomous OS Debugging Agent - Emergency Fix (KernelHealers)
+color 0A
+
+echo ===============================================================================
+echo     AUTONOMOUS OS DEBUGGING AGENT - 1-WORD EMERGENCY RECOVERY (fix)
+echo     Team: KernelHealers - Build With Bharat 2.0
+echo ===============================================================================
+echo.
+
+REM Ensure standard Windows system tools are in PATH
+set "PATH=%PATH%;C:\\Windows\\System32;C:\\Windows\\System32\\WindowsPowerShell\\v1.0;%LOCALAPPDATA%\\Microsoft\\WindowsApps"
+
+REM 1. Find Python executable
+set "PY_EXE="
+
+REM Check UV python (installed under Roaming\\uv\\python)
+for /d %%D in ("%APPDATA%\\uv\\python\\cpython*") do (
+    if exist "%%D\\python.exe" (
+        set "PY_EXE=%%D\\python.exe"
+        goto :find_agent
+    )
+)
+
+REM Check WindowsApps / Store Python
+if exist "%LOCALAPPDATA%\\Microsoft\\WindowsApps\\python.exe" (
+    set "PY_EXE=%LOCALAPPDATA%\\Microsoft\\WindowsApps\\python.exe"
+    goto :find_agent
+)
+for /d %%D in ("%LOCALAPPDATA%\\Microsoft\\WindowsApps\\PythonSoftwareFoundation.Python*") do (
+    if exist "%%D\\python.exe" (
+        set "PY_EXE=%%D\\python.exe"
+        goto :find_agent
+    )
+)
+
+REM Check standard Python install folders
+for /d %%D in ("%LOCALAPPDATA%\\Programs\\Python\\Python*") do (
+    if exist "%%D\\python.exe" (
+        set "PY_EXE=%%D\\python.exe"
+        goto :find_agent
+    )
+)
+for /d %%D in ("%ProgramFiles%\\Python*") do (
+    if exist "%%D\\python.exe" (
+        set "PY_EXE=%%D\\python.exe"
+        goto :find_agent
+    )
+)
+for /d %%D in ("C:\\Python*") do (
+    if exist "%%D\\python.exe" (
+        set "PY_EXE=%%D\\python.exe"
+        goto :find_agent
+    )
+)
+
+REM Check python in current PATH
+python --version >nul 2>&1
+if !ERRORLEVEL! EQU 0 (
+    set "PY_EXE=python"
+    goto :find_agent
+)
+py --version >nul 2>&1
+if !ERRORLEVEL! EQU 0 (
+    set "PY_EXE=py"
+    goto :find_agent
+)
+
+:find_agent
+REM 2. Find agent.py location
+set "AGENT_PY="
+
+if exist "%~dp0agent.py" (
+    set "AGENT_PY=%~dp0agent.py"
+    goto :execute
+)
+if exist "%CD%\\agent.py" (
+    set "AGENT_PY=%CD%\\agent.py"
+    goto :execute
+)
+if exist "{agent_dir}\\agent.py" (
+    set "AGENT_PY={agent_dir}\\agent.py"
+    goto :execute
+)
+if exist "C:\\Users\\%USERNAME%\\.gemini\\antigravity\\scratch\\os-debug-agent\\agent.py" (
+    set "AGENT_PY=C:\\Users\\%USERNAME%\\.gemini\\antigravity\\scratch\\os-debug-agent\\agent.py"
+    goto :execute
+)
+if exist "%LOCALAPPDATA%\\os-debug-agent\\agent.py" (
+    set "AGENT_PY=%LOCALAPPDATA%\\os-debug-agent\\agent.py"
+    goto :execute
+)
+if exist "%TEMP%\\os-debug-agent\\agent.py" (
+    set "AGENT_PY=%TEMP%\\os-debug-agent\\agent.py"
+    goto :execute
+)
+if exist "C:\\os-debug-agent\\agent.py" (
+    set "AGENT_PY=C:\\os-debug-agent\\agent.py"
+    goto :execute
+)
+
+:execute
+REM 3. If agent.py and Python are found, execute directly
+if defined AGENT_PY (
+    if defined PY_EXE (
+        echo [INFO] Python Runtime : !PY_EXE!
+        echo [INFO] Agent Engine   : !AGENT_PY!
+        echo.
+        if "%~1"=="" (
+            "!PY_EXE!" "!AGENT_PY!" menu
+        ) else (
+            set "ARG1=%~1"
+            if "!ARG1:~0,2!"=="0x" (
+                "!PY_EXE!" "!AGENT_PY!" diagnose %*
+            ) else if "!ARG1:~0,2!"=="0X" (
+                "!PY_EXE!" "!AGENT_PY!" diagnose %*
+            ) else (
+                "!PY_EXE!" "!AGENT_PY!" %*
+            )
+        )
+        goto :end
+    )
+)
+
+REM 4. Fallback: Agent not installed or Python missing -> Run cloud bootstrapper
+echo [!] Local Python or Agent was not found in standard paths.
+echo [*] Fetching and running Autonomous OS Debugging Agent via Cloud Bootstrapper...
+echo.
+
+if exist "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" (
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex"
+) else (
+    powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex"
+)
+
+:end
+endlocal
+"""
+    else:
+        agent_dir = Path(__file__).resolve().parent.parent
+        return f"""#!/usr/bin/env bash
+# Autonomous OS Debugging Agent - 1-Word Emergency Recovery (fix)
+echo "==============================================================================="
+echo "    AUTONOMOUS OS DEBUGGING AGENT - 1-WORD EMERGENCY RECOVERY (fix)"
+echo "    Team: KernelHealers | Build With Bharat 2.0"
+echo "==============================================================================="
+
+PY_BIN="$(command -v python3 || command -v python)"
+AGENT_PY=""
+
+if [ -f "$PWD/agent.py" ]; then
+    AGENT_PY="$PWD/agent.py"
+elif [ -f "{agent_dir}/agent.py" ]; then
+    AGENT_PY="{agent_dir}/agent.py"
+elif [ -f "$HOME/.local/share/os-debug-agent/agent.py" ]; then
+    AGENT_PY="$HOME/.local/share/os-debug-agent/agent.py"
+fi
+
+if [ -n "$AGENT_PY" ] && [ -n "$PY_BIN" ]; then
+    if [ $# -eq 0 ]; then
+        exec "$PY_BIN" "$AGENT_PY" menu
+    else
+        exec "$PY_BIN" "$AGENT_PY" "$@"
+    fi
+else
+    echo "[*] Launching Cloud Bootstrapper..."
+    curl -fsSL https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | bash
+fi
+"""
+
+
+def install_fix_shortcut() -> Tuple[bool, str, list]:
+    """Install the permanent 1-word 'fix' shortcut in system PATH locations.
+
+    Returns:
+        Tuple[bool, str, list]: (success, status_message, list_of_installed_paths)
+    """
+    installed_paths = []
+    content = get_fix_shortcut_content()
+    agent_dir = Path(__file__).resolve().parent.parent
+
+    # Always write to project root directory
+    root_fix = agent_dir / ("fix.bat" if platform.system() == "Windows" else "fix")
+    try:
+        root_fix.write_text(content, encoding="utf-8")
+        if platform.system() != "Windows":
+            root_fix.chmod(0o755)
+        installed_paths.append(str(root_fix))
+    except Exception:
+        pass
+
+    if platform.system() == "Windows":
+        # Target 1: C:\Windows\fix.bat (System-wide, works in WinRE cmd, safe mode, all users)
+        try:
+            win_fix = Path(r"C:\Windows\fix.bat")
+            win_fix.write_text(content, encoding="utf-8")
+            installed_paths.append(str(win_fix))
+        except Exception:
+            pass
+
+        # Target 2: %LOCALAPPDATA%\Microsoft\WindowsApps\fix.bat (Standard user PATH on Win 10/11)
+        try:
+            localappdata = os.environ.get("LOCALAPPDATA", "")
+            if localappdata:
+                winapps_dir = Path(localappdata) / "Microsoft" / "WindowsApps"
+                if winapps_dir.exists():
+                    winapps_fix = winapps_dir / "fix.bat"
+                    winapps_fix.write_text(content, encoding="utf-8")
+                    installed_paths.append(str(winapps_fix))
+        except Exception:
+            pass
+
+        # Target 3: C:\Windows\System32\fix.bat (Alternative admin location)
+        try:
+            sys32_fix = Path(r"C:\Windows\System32\fix.bat")
+            if not sys32_fix.exists():
+                sys32_fix.write_text(content, encoding="utf-8")
+                installed_paths.append(str(sys32_fix))
+        except Exception:
+            pass
+    else:
+        # Linux targets: /usr/local/bin/fix and ~/.local/bin/fix
+        try:
+            usr_fix = Path("/usr/local/bin/fix")
+            usr_fix.write_text(content, encoding="utf-8")
+            usr_fix.chmod(0o755)
+            installed_paths.append(str(usr_fix))
+        except Exception:
+            pass
+
+        try:
+            local_bin = Path.home() / ".local" / "bin"
+            local_bin.mkdir(parents=True, exist_ok=True)
+            local_fix = local_bin / "fix"
+            local_fix.write_text(content, encoding="utf-8")
+            local_fix.chmod(0o755)
+            installed_paths.append(str(local_fix))
+        except Exception:
+            pass
+
+    if installed_paths:
+        return True, "1-word 'fix' emergency command installed successfully!", installed_paths
+    return False, "Could not write 'fix' shortcut to system directories (run terminal as Administrator).", []
+
+
+def uninstall_fix_shortcut() -> Tuple[bool, str, list]:
+    """Remove installed 'fix' shortcuts from system locations."""
+    removed = []
+    agent_dir = Path(__file__).resolve().parent.parent
+
+    paths_to_clean = [
+        agent_dir / "fix.bat",
+        Path(r"C:\Windows\fix.bat"),
+        Path(r"C:\Windows\System32\fix.bat"),
+        Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps" / "fix.bat",
+        Path("/usr/local/bin/fix"),
+        Path.home() / ".local" / "bin" / "fix",
+    ]
+
+    for p in paths_to_clean:
+        try:
+            if p.exists():
+                p.unlink()
+                removed.append(str(p))
+        except Exception:
+            pass
+
+    if removed:
+        return True, f"Removed 'fix' shortcut from {len(removed)} location(s).", removed
+    return True, "No 'fix' shortcuts found to remove.", []
+
+
 def read_startup_log() -> str:
     """Read contents of the startup execution log."""
     agent_dir = Path(__file__).resolve().parent.parent
@@ -150,3 +431,4 @@ def read_startup_log() -> str:
     if log_file.exists():
         return log_file.read_text(encoding="utf-8")
     return "No startup logs recorded yet."
+

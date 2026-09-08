@@ -22,9 +22,12 @@ try:
     from algosdk.v2client import algod
 except ImportError:
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "py-algorand-sdk", "--disable-pip-version-check", "--quiet"]
-        )
+        try:
+            subprocess.check_call(["uv", "pip", "install", "py-algorand-sdk", "--python", sys.executable, "--quiet"])
+        except Exception:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "py-algorand-sdk", "--break-system-packages", "--disable-pip-version-check", "--quiet"]
+            )
         import algosdk
         from algosdk import account, mnemonic
         from algosdk.transaction import PaymentTxn, SuggestedParams

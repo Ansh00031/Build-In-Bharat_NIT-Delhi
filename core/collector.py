@@ -180,14 +180,38 @@ def query_linux_syslog(max_events: int = 50) -> Dict[str, Any]:
     }
 
 
+def detect_system_errors(context: Dict[str, Any]) -> List[str]:
+    """Scan collected event logs and detect explicit error codes, hex codes, or failed components."""
+    import re
+    detected: List[str] = []
+    events = context.get("event_logs", [])
+
+    for evt in events:
+        msg = str(evt.get("Message", ""))
+        # Search for hex error codes like 0x80070005 or 0x80240020
+        hex_matches = re.findall(r"0x[0-9a-fA-F]{8}", msg)
+        for h in hex_matches:
+            if h not in detected:
+                detected.append(h)
+
+        # Search for Windows Update errors (e.g. 80070005)
+        std_matches = re.findall(r"\b(?:0x)?[89][0-9A-Fa-f]{7}\b", msg)
+        for s in std_matches:
+            norm = s if s.startswith("0x") else f"0x{s}"
+            if norm not in detected:
+                detected.append(norm)
+
+    return detected
+
+
 def gather_system_context(
-    error_code: str,
+    error_code: Optional[str] = None,
     max_events: int = 50,
 ) -> Dict[str, Any]:
     """Gather comprehensive system and log context formatted for AI diagnostic ingestion.
 
     Args:
-        error_code: Target error code (e.g., '0x80070005').
+        error_code: Target error code (e.g., '0x80070005'), or None for whole laptop scan.
         max_events: Number of critical/error log events to collect.
 
     Returns:
@@ -202,7 +226,7 @@ def gather_system_context(
         logs = query_linux_syslog(max_events=max_events)
 
     context: Dict[str, Any] = {
-        "target_error_code": error_code,
+        "target_error_code": error_code or "FULL_SYSTEM_SCAN",
         "collected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "os_info": sys_meta,
         "event_logs_summary": {
@@ -212,5 +236,8 @@ def gather_system_context(
         },
         "event_logs": logs.get("events", []),
     }
+
+    detected = detect_system_errors(context)
+    context["detected_error_codes"] = detected
 
     return context

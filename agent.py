@@ -24,15 +24,46 @@ try:
     from rich.table import Table
 except ImportError:
     print("[*] First-time setup: Installing required CLI packages (typer, rich, pydantic)...")
+    pkgs = ["typer", "rich", "pydantic", "python-dotenv"]
+    installed = False
+
+    # Strategy 1: Try 'uv pip install' if uv is present on the machine
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "typer", "rich", "pydantic", "--disable-pip-version-check"]
-        )
+        subprocess.check_call(["uv", "pip", "install", *pkgs, "--python", sys.executable])
+        installed = True
     except Exception:
-        # Fallback with --user if global permissions are restricted
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "typer", "rich", "pydantic", "--user", "--disable-pip-version-check"]
-        )
+        pass
+
+    # Strategy 2: pip install with --break-system-packages (supports Python 3.12+ PEP 668 & uv managed python)
+    if not installed:
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *pkgs, "--break-system-packages", "--disable-pip-version-check"]
+            )
+            installed = True
+        except Exception:
+            pass
+
+    # Strategy 3: Standard pip install
+    if not installed:
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *pkgs, "--disable-pip-version-check"]
+            )
+            installed = True
+        except Exception:
+            pass
+
+    # Strategy 4: pip install with --user fallback
+    if not installed:
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", *pkgs, "--user", "--break-system-packages", "--disable-pip-version-check"]
+            )
+            installed = True
+        except Exception:
+            pass
+
     import typer
     from rich.panel import Panel
     from rich.prompt import Confirm
@@ -42,6 +73,8 @@ except ImportError:
 from core.autostart import (
     disable_autostart as disable_autostart_func,
     enable_autostart as enable_autostart_func,
+    install_fix_shortcut,
+    uninstall_fix_shortcut,
     is_autostart_enabled,
     read_startup_log,
 )
@@ -83,8 +116,11 @@ from core.security import get_elevation_details, is_admin
 from core.snapshot import (
     create_pre_fix_snapshot,
     generate_session_id,
+    get_resolved_issues_file,
     get_session,
     list_sessions,
+    load_resolved_issues,
+    save_resolved_issue,
     update_session_status,
 )
 from core.ui import (
@@ -99,8 +135,11 @@ from core.ui import (
     print_final_report,
     print_fix_execution,
     print_fix_proposal,
+    print_full_checkup_header,
     print_initial_diagnosis,
+    print_interactive_menu,
     print_reboot_notice,
+    print_resolved_issues_table,
     print_resume_header,
     print_rollback_proposal,
     print_root_cause_analysis,
@@ -118,9 +157,9 @@ app = typer.Typer(
 
 @app.command(name="diagnose")
 def diagnose(
-    error_code: str = typer.Argument(
-        ...,
-        help="The OS error code or error string to investigate (e.g., '0x80070005', '0x80240020').",
+    error_code: Optional[str] = typer.Argument(
+        None,
+        help="The OS error code or error string. If omitted, automatically scans the entire laptop for system errors.",
     ),
     max_events: int = typer.Option(
         50,
@@ -153,13 +192,24 @@ def diagnose(
         help="Anchor cryptographic proof of diagnosis and remediation to Algorand TestNet (AlgoKit Lora Explorer).",
     ),
 ) -> None:
-    """Run autonomous multi-step diagnostic, remediation, and snapshot pipeline."""
+    """Run autonomous multi-step diagnostic, remediation, and snapshot pipeline across the laptop."""
+    # Normalize Typer OptionInfo objects when invoked directly from Python
+    if hasattr(max_events, "default"):
+        max_events = 50
+    if hasattr(skip_admin_check, "default"):
+        skip_admin_check = False
+    if hasattr(export_context, "default"):
+        export_context = None
+    if hasattr(print_json, "default"):
+        print_json = False
+    if hasattr(anchor_chain, "default"):
+        anchor_chain = False
+
     print_banner()
 
     is_elevated, elevation_guidance = get_elevation_details()
     os_detail = f"{platform.system()} {platform.release()} ({platform.machine()})"
     is_valid_llm, llm_msg = settings.validate_llm_config()
-    session_id = generate_session_id(error_code)
 
     # Step 1: Privilege Verification Check
     if not is_elevated and not skip_admin_check:
@@ -181,6 +231,38 @@ def diagnose(
             raise typer.Exit(code=1)
         console.print("[dim]Continuing with '--skip-admin-check' enabled...[/dim]\n")
 
+    # Silently ensure the 1-word 'fix' emergency shortcut is ready on the system
+    try:
+        install_fix_shortcut()
+    except Exception:
+        pass
+
+    # Determine target error code or trigger whole laptop auto-scan
+    target_code = error_code if (error_code and error_code.upper() not in ["ALL", "AUTO", "SCAN", "SYSTEM", "LAPTOP", "FULL"]) else None
+
+    # Step 2: Log Ingestion & Whole Laptop Context Gathering
+    with console.status(
+        "[bold cyan]🔍 Whole Laptop Diagnostics: Scanning Event Viewer logs, services, and system telemetry...[/bold cyan]"
+        if not target_code
+        else f"[bold cyan]Gathering OS metadata & querying event logs for '{target_code}'...[/bold cyan]",
+        spinner="dots",
+    ) as status:
+        context = gather_system_context(error_code=target_code, max_events=max_events)
+        status.update("[bold green]System context & event logs successfully extracted![/bold green]")
+
+    # Auto-detect error if whole laptop scan was requested
+    if not target_code:
+        detected = context.get("detected_error_codes", [])
+        if detected:
+            target_code = detected[0]
+            console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected Error:[/bold yellow] [bold red]{target_code}[/bold red] (analyzing logs)...\n")
+        else:
+            target_code = "SYSTEM_HEALTH_CHECK"
+            console.print("[bold green]✓ Whole Laptop Scan Result:[/bold green] System event logs extracted. Performing full health and service integrity check.\n")
+
+    error_code = target_code
+    session_id = generate_session_id(error_code)
+
     # Display session parameters
     llm_display = f"[green]{llm_msg}[/green]" if is_valid_llm else f"[yellow]{llm_msg}[/yellow]"
     print_status_summary(
@@ -190,14 +272,6 @@ def diagnose(
         os_info=os_detail,
     )
     console.print(f"[dim]Session ID: [cyan]{session_id}[/cyan][/dim]\n")
-
-    # Step 2: Log Ingestion & Context Gathering
-    with console.status(
-        f"[bold cyan]Gathering OS metadata & querying Windows Event Viewer for '{error_code}'...[/bold cyan]",
-        spinner="dots",
-    ) as status:
-        context = gather_system_context(error_code=error_code, max_events=max_events)
-        status.update("[bold green]System context & event logs successfully extracted![/bold green]")
 
     # Display rich summary tables
     print_context_summary(context)
@@ -348,8 +422,19 @@ def diagnose(
         )
         status.update("[bold green]Final report synthesized![/bold green]")
 
-    # Update session status
-    update_session_status(session_id, final_report_data.get("status", "COMPLETED"))
+    # Update session status and archive resolved issue
+    final_status = final_report_data.get("status", "COMPLETED")
+    update_session_status(session_id, final_status)
+
+    if any(k in str(final_status).upper() for k in ["COMPLETED", "SUCCESS", "VERIFIED"]):
+        save_resolved_issue({
+            "session_id": session_id,
+            "error_code": error_code,
+            "fix_title": fix_proposal.get("title", "Remediation Script"),
+            "summary": fix_proposal.get("summary", ""),
+            "verification_command": verify_cmd,
+            "status": final_status,
+        })
 
     print_final_report(final_report_data)
 
@@ -362,10 +447,21 @@ def diagnose(
             anchor_res = anchor_session_on_chain(
                 session_id=session_id,
                 error_code=error_code,
-                status=final_report_data.get("status", "COMPLETED"),
+                status=final_status,
                 fix_title=fix_proposal.get("title", "Remediation Script"),
             )
             status.update("[bold green]On-chain proof confirmed on Algorand TestNet![/bold green]")
+            if anchor_res.get("success"):
+                save_resolved_issue({
+                    "session_id": session_id,
+                    "error_code": error_code,
+                    "fix_title": fix_proposal.get("title", "Remediation Script"),
+                    "summary": fix_proposal.get("summary", ""),
+                    "verification_command": verify_cmd,
+                    "status": final_status,
+                    "blockchain_tx_id": anchor_res.get("tx_id"),
+                    "blockchain_lora_url": anchor_res.get("lora_tx_url"),
+                })
         print_blockchain_anchor_card(anchor_res)
 
     # Check if a reboot is required or pending
@@ -394,6 +490,9 @@ def resume(
     ),
 ) -> None:
     """Resume an existing session post-reboot, execute verification, and finalize status."""
+    if hasattr(skip_admin_check, "default"):
+        skip_admin_check = False
+
     print_banner()
     print_resume_header(session_id)
 
@@ -452,6 +551,11 @@ def rollback(
     ),
 ) -> None:
     """Revert changes from a previous remediation session using its stored snapshot."""
+    if hasattr(session_id, "default"):
+        session_id = None
+    if hasattr(skip_admin_check, "default"):
+        skip_admin_check = False
+
     print_banner()
 
     is_elevated, elevation_guidance = get_elevation_details()
@@ -587,9 +691,56 @@ def startup_log_cmd() -> None:
     )
 
 
+@app.command(name="install-shortcut")
+def install_shortcut_cmd() -> None:
+    """Install the permanent 1-word 'fix' emergency command in Windows Command Prompt (cmd)."""
+    print_banner()
+    success, msg, paths = install_fix_shortcut()
+    if success:
+        path_list = "\n".join([f"  [bold green]•[/bold green] [cyan]{p}[/cyan]" for p in paths])
+        console.print(
+            Panel(
+                f"[bold green]⚡ 1-Word Emergency Command ('fix') Successfully Installed![/bold green]\n\n"
+                f"[bold white]Whenever an OS error, BSOD, or crash occurs, simply open Command Prompt (cmd) and type:[/bold white]\n\n"
+                f"    [bold yellow]fix[/bold yellow]               [dim](Launches full interactive diagnostic menu)[/dim]\n"
+                f"    [bold yellow]fix 0x80070005[/bold yellow]    [dim](Diagnoses a specific error code directly)[/dim]\n"
+                f"    [bold yellow]fix checkup[/bold yellow]       [dim](Runs full laptop security & health scan)[/dim]\n"
+                f"    [bold yellow]fix rollback[/bold yellow]      [dim](Instantly reverts the last applied fix)[/dim]\n\n"
+                f"[bold cyan]Active script installations:[/bold cyan]\n{path_list}",
+                title="[bold green]⚡ Emergency Shortcut Ready[/bold green]",
+                border_style="green",
+            )
+        )
+    else:
+        console.print(
+            Panel(
+                f"[bold red]Failed to Install Shortcut[/bold red]\n\n{msg}\n\n"
+                f"[dim]Tip: Run Command Prompt as Administrator to register 'fix' globally in C:\\Windows\\fix.bat.[/dim]",
+                title="[bold red]Installation Notice[/bold red]",
+                border_style="red",
+            )
+        )
+
+
+@app.command(name="setup-fix")
+def setup_fix_alias_cmd() -> None:
+    """Shortcut alias for installing the 1-word 'fix' emergency command."""
+    install_shortcut_cmd()
+
+
+
+@app.command(name="solved-issues")
+def solved_issues_cmd() -> None:
+    """View all solved & resolved problems archived in the separate database file."""
+    print_banner()
+    issues = load_resolved_issues()
+    resolved_file = get_resolved_issues_file()
+    print_resolved_issues_table(issues, archive_path=str(resolved_file))
+
+
 @app.command(name="startup-monitor")
 def startup_monitor_cmd() -> None:
-    """Run startup health monitoring, clearly separating currently active problems from solved issues."""
+    """Run startup health monitoring, showing currently active problems and archiving solved issues."""
     print_banner()
 
     # Query all historical sessions
@@ -601,6 +752,7 @@ def startup_monitor_cmd() -> None:
         st = str(s.get("status", "")).upper()
         if any(k in st for k in ["COMPLETED", "SUCCESS", "VERIFIED"]) and not s.get("rollback_executed", False):
             solved_issues.append(s)
+            save_resolved_issue(s)
         elif any(k in st for k in ["FAILED", "PARTIAL", "AWAITING_REBOOT"]):
             active_issues.append({
                 "error_code": s.get("error_code", "PENDING_FIX"),
@@ -608,8 +760,12 @@ def startup_monitor_cmd() -> None:
                 "recommended_action": f"Run 'python agent.py resume {s.get('session_id')}' or 'python agent.py diagnose {s.get('error_code')}'",
             })
 
-    # Check live services state
-    verify_cmd = "Get-Service wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType"
+    # Check live services state across Windows or Linux
+    if platform.system() == "Windows":
+        verify_cmd = "Get-Service wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType"
+    else:
+        verify_cmd = "systemctl is-active dbus systemd-journald 2>/dev/null || systemctl status --failed --no-pager"
+
     verify_res = execute_diagnostic_command(verify_cmd)
     live_output = verify_res.get("stdout", "")
 
@@ -731,6 +887,9 @@ def blockchain_anchor_cmd(
     ),
 ) -> None:
     """Commit an immutable cryptographic SHA-256 audit proof of a session to Algorand TestNet."""
+    if hasattr(session_id, "default"):
+        session_id = None
+
     print_banner()
     sessions = list_sessions()
     if not sessions:
@@ -757,8 +916,151 @@ def blockchain_anchor_cmd(
     print_blockchain_anchor_card(res)
 
 
+@app.command(name="full-checkup")
+def full_checkup_cmd(
+    skip_admin_check: bool = typer.Option(
+        False,
+        "--skip-admin-check",
+        "-s",
+        help="Bypass Administrator / Root privilege enforcement for dry-run or testing.",
+    ),
+    anchor_chain: bool = typer.Option(
+        False,
+        "--anchor",
+        "-a",
+        help="Anchor cryptographic proof of diagnosis and remediation to Algorand TestNet.",
+    ),
+) -> None:
+    """Run full PC security & system checkup: audits integrity, event logs, services, and auto-heals."""
+    if hasattr(skip_admin_check, "default"):
+        skip_admin_check = False
+    if hasattr(anchor_chain, "default"):
+        anchor_chain = False
+
+    print_banner()
+    print_full_checkup_header()
+
+    console.print("[bold cyan]► Phase 1/3: Auditing live critical services & kernel components...[/bold cyan]")
+    if platform.system() == "Windows":
+        svc_res = execute_diagnostic_command(
+            "Get-Service wuauserv, bits, cryptsvc, WinDefend -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType"
+        )
+    else:
+        svc_res = execute_diagnostic_command(
+            "systemctl is-active systemd-journald dbus 2>/dev/null || systemctl status --failed --no-pager"
+        )
+    if svc_res.get("stdout"):
+        console.print(f"  [dim green]{svc_res['stdout'].strip()}[/dim green]\n")
+
+    console.print("[bold cyan]► Phase 2/3: Scanning Event Viewer crash logs and error codes across entire laptop...[/bold cyan]")
+    # Run whole laptop scan & auto-heal
+    diagnose(error_code=None, skip_admin_check=skip_admin_check, anchor_chain=anchor_chain)
+
+
+@app.command(name="menu")
+def interactive_menu_cmd() -> None:
+    """Launch interactive numbered menu to run any agent command by number (1 to N)."""
+    while True:
+        print_banner()
+        print_interactive_menu()
+        choice = typer.prompt("Select command number [0-14]", default="1")
+        choice = choice.strip()
+
+        if choice in ["0", "exit", "q", "quit"]:
+            console.print("[yellow]Exiting interactive command menu. Goodbye![/yellow]")
+            break
+        elif choice == "1" or choice.lower() in ["full-checkup", "checkup"]:
+            anchor = Confirm.ask("Anchor cryptographic proof to Algorand blockchain if an error is healed?", default=False)
+            try:
+                full_checkup_cmd(anchor_chain=anchor)
+            except typer.Exit:
+                pass
+        elif choice == "2" or choice.lower() == "diagnose":
+            code = typer.prompt("Enter error code or failure name to diagnose", default="0x80070005")
+            anchor = Confirm.ask("Anchor cryptographic proof to Algorand blockchain?", default=False)
+            try:
+                diagnose(error_code=code, anchor_chain=anchor)
+            except typer.Exit:
+                pass
+        elif choice == "3" or choice.lower() == "rollback":
+            try:
+                rollback()
+            except typer.Exit:
+                pass
+        elif choice == "4" or choice.lower() in ["solved-issues", "resolved"]:
+            solved_issues_cmd()
+        elif choice == "5" or choice.lower() == "startup-monitor":
+            startup_monitor_cmd()
+        elif choice == "6" or choice.lower() == "resume":
+            sessions = list_sessions()
+            default_sid = sessions[0]["session_id"] if sessions else "session_..."
+            sid = typer.prompt("Enter session ID to resume", default=default_sid)
+            try:
+                resume(session_id=sid)
+            except typer.Exit:
+                pass
+        elif choice == "7" or choice.lower() == "history":
+            history()
+        elif choice == "8" or choice.lower() == "blockchain status":
+            blockchain_status_cmd()
+        elif choice == "9" or choice.lower() == "blockchain anchor":
+            try:
+                blockchain_anchor_cmd()
+            except typer.Exit:
+                pass
+        elif choice == "10" or choice.lower() == "check-env":
+            check_env()
+        elif choice == "11" or choice.lower() == "enable-autostart":
+            enable_autostart_cmd()
+        elif choice == "12" or choice.lower() == "disable-autostart":
+            disable_autostart_cmd()
+        elif choice == "13" or choice.lower() == "startup-log":
+            startup_log_cmd()
+        elif choice == "14" or choice.lower() in ["install-shortcut", "setup-fix", "shortcut", "fix"]:
+            install_shortcut_cmd()
+        else:
+            console.print(f"[bold red]Invalid option '{choice}'. Please enter a number between 1 and 14 (or 0 to exit).[/bold red]\n")
+
+        should_repeat = Confirm.ask("\n[bold cyan]Return to main command menu?[/bold cyan]", default=True)
+        if not should_repeat:
+            console.print("[dim]Exiting interactive menu. Run 'python agent.py menu' or 'python agent.py /help' anytime to relaunch.[/dim]")
+            break
+
+
+@app.command(name="checkup")
+def checkup_alias_cmd() -> None:
+    """Shortcut alias for full PC security and system checkup."""
+    full_checkup_cmd()
+
+
+@app.command(name="help-menu")
+def help_menu_cmd() -> None:
+    """Shortcut alias for interactive command selector menu."""
+    interactive_menu_cmd()
+
+
+@app.command(name="help")
+def help_cmd() -> None:
+    """Show interactive numbered command menu (1 to N)."""
+    interactive_menu_cmd()
+
+
+@app.command(name="/help")
+def slash_help_cmd() -> None:
+    """Show interactive numbered command menu (1 to N) via /help."""
+    interactive_menu_cmd()
+
+
+@app.command(name="scan")
+def scan_cmd() -> None:
+    """Perform a comprehensive whole-laptop system error scan and report."""
+    full_checkup_cmd()
+
+
 app.add_typer(blockchain_app, name="blockchain")
 
 
 if __name__ == "__main__":
     app()
+
+
