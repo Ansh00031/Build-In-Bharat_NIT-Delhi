@@ -67,7 +67,7 @@ QA_DATA = [
             ("Who is the target user for this tool?",
              "Anyone who uses Windows — from home users whose PC crashes, to IT teams in companies managing hundreds of computers. No technical knowledge is required to use it."),
             ("Is this project open-source? Where is the code?",
-             "Yes, it is 100% open-source. The full code is available on GitHub at: github.com/Ansh00031/SGU-AI-Thon"),
+             "Yes, it is 100% open-source. The full code is available on GitHub at: github.com/Ansh00031/Build-In-Bharat_NIT-Delhi"),
             ("What operating systems does it support?",
              "Currently it fully supports Windows 10 and Windows 11. Linux and macOS support is planned for future versions."),
             ("What programming language is the project built in?",
@@ -89,7 +89,7 @@ QA_DATA = [
             ("Can it work fully offline?",
              "Yes. By configuring a local AI model via Ollama, the agent can diagnose and fix errors completely offline. The only internet-requiring feature is the Algorand blockchain anchor."),
             ("What is the GitHub repository link for this project?",
-             "github.com/Ansh00031/SGU-AI-Thon — contains full source code, documentation, PDF, presentation, and the 1-line WinRE rescue command."),
+             "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi — contains full source code, documentation, PDF, presentation, and the 1-line WinRE rescue command."),
             ("What was the inspiration behind building this?",
              "The team experienced Windows Update failures and OS errors that wasted hours of time. The idea was to build an autonomous AI agent that solves these problems the same way an expert IT engineer would — but in seconds."),
         ]
@@ -332,7 +332,7 @@ QA_DATA = [
             ("How do you enter WinRE on a Windows machine?",
              "Method 1: Force restart 3 times (hold power button to turn off 3 times). Method 2: Hold Shift while clicking Restart in the Start Menu. Method 3: Boot from a Windows USB drive."),
             ("What is the 1-line cloud rescue command?",
-             "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex — Run this in WinRE PowerShell. It downloads and launches the full agent automatically."),
+             "irm https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | iex — Run this in WinRE PowerShell. It downloads and launches the full agent automatically."),
             ("What is bootstrap.ps1 and what does it do?",
              "It is a PowerShell script hosted on GitHub. When run, it: detects your offline Windows drive, downloads a portable Python runtime, downloads the agent code, installs dependencies, and launches the agent."),
             ("What is rescue.bat used for?",
@@ -342,7 +342,7 @@ QA_DATA = [
             ("What is Portable Python and how is it downloaded?",
              "It is a lightweight version of Python (~15MB) that does not require installation — it runs directly from a folder. The bootstrap downloads it from python.org and extracts it to the temp directory."),
             ("From where are the core agent files downloaded?",
-             "From the GitHub raw content URL: https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/[filename]. Each core file is downloaded individually."),
+             "From the GitHub raw content URL: https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/[filename]. Each core file is downloaded individually."),
             ("What files does bootstrap.ps1 download from GitHub?",
              "agent.py and all core/ module files: config.py, collector.py, executor.py, llm.py, remediation.py, security.py, snapshot.py, system_paths.py, reboot_manager.py, autostart.py, ui.py, blockchain.py"),
             ("Does WinRE have internet access by default?",
@@ -541,7 +541,7 @@ def build_qa_pdf():
         ["Hackathon", "Build With Bharat 2.0"],
         ["Theme", "Blockchain & Web3 — Agentic Solutions (x402)"],
         ["Blockchain", "Algorand TestNet  |  lora.algokit.io/testnet"],
-        ["GitHub", "github.com/Ansh00031/SGU-AI-Thon"],
+        ["GitHub", "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi"],
         ["Total Questions", "200 across 10 categories with full easy-language answers"],
     ]
     ct = Table(cover_data, colWidths=[4*cm, 12.5*cm])
@@ -618,7 +618,7 @@ def build_qa_pdf():
         sub_s))
     story.append(HRFlowable(width="100%", thickness=2, color=BLUE, spaceAfter=10))
     story.append(Paragraph(
-        "github.com/Ansh00031/SGU-AI-Thon  |  lora.algokit.io/testnet",
+        "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi  |  lora.algokit.io/testnet",
         ParagraphStyle("fc", fontSize=11, textColor=TEAL, alignment=TA_CENTER)))
 
     doc.build(story)

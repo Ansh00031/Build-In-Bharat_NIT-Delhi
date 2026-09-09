@@ -98,12 +98,12 @@ If a laptop is stuck in a boot loop or does **NOT** have this project installed,
 
 ```powershell
 # Run directly in PowerShell or WinRE:
-irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex
+irm https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | iex
 ```
 
 Or from the standard **WinRE `cmd.exe` Command Prompt**:
 ```cmd
-powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex"
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | iex"
 ```
 
 > **How it works:** It automatically detects internal storage drives (`C:\`, `D:\`), locates or bootstraps a lightweight portable Python runtime (~15MB), downloads the agent code, and launches the autonomous diagnostic environment immediately!
@@ -317,5 +317,8 @@ os-debug-agent/
 ## 📄 License
 
 Distributed under the **MIT License**. See `LICENSE` for more information.
-#   S G U - A I - T h o n  
- 
+
+---
+
+### 🌐 Official Repository
+**GitHub:** [Ansh00031/Build-In-Bharat_NIT-Delhi](https://github.com/Ansh00031/Build-In-Bharat_NIT-Delhi)

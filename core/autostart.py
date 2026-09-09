@@ -282,9 +282,9 @@ echo [*] Fetching and running Autonomous OS Debugging Agent via Cloud Bootstrapp
 echo.
 
 if exist "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" (
-    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex"
+    "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | iex"
 ) else (
-    powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | iex"
+    powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | iex"
 )
 
 :end
@@ -318,7 +318,7 @@ if [ -n "$AGENT_PY" ] && [ -n "$PY_BIN" ]; then
     fi
 else
     echo "[*] Launching Cloud Bootstrapper..."
-    curl -fsSL https://raw.githubusercontent.com/Ansh00031/SGU-AI-Thon/main/bootstrap.ps1 | bash
+    curl -fsSL https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main/bootstrap.ps1 | bash
 fi
 """
 

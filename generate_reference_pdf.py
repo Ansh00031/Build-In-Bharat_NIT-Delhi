@@ -612,7 +612,7 @@ def build_pdf():
         ["Members", "Ansh (Leader)  ·  Swati  ·  Aman  ·  Shivang"],
         ["Hackathon Theme", "Blockchain & Web3 — Agentic Solutions (x402)"],
         ["Blockchain", "Algorand TestNet  |  AlgoKit Lora Explorer"],
-        ["GitHub", "github.com/Ansh00031/SGU-AI-Thon"],
+        ["GitHub", "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi"],
     ]
     info_table = Table(info_data, colWidths=[4 * cm, 12 * cm])
     info_table.setStyle(TableStyle([
@@ -711,7 +711,7 @@ def build_pdf():
     story.append(HRFlowable(width="100%", thickness=2, color=BLUE))
     story.append(Spacer(1, 0.5 * cm))
     story.append(Paragraph(
-        "github.com/Ansh00031/SGU-AI-Thon  |  "
+        "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi  |  "
         "lora.algokit.io/testnet",
         ParagraphStyle("footer", fontSize=11, textColor=TEAL,
                        alignment=TA_CENTER)))

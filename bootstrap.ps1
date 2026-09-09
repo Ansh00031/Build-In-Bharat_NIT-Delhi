@@ -69,7 +69,9 @@ if ($pythonExe) {
 # 3. Download Latest Agent Source from GitHub Repository
 Write-Host "[3/4] Fetching latest Autonomous OS Debugging Agent files from cloud..." -ForegroundColor Cyan
 
-# Default repository URL
+# Official repository raw content URL
+$rawBase = "https://raw.githubusercontent.com/Ansh00031/Build-In-Bharat_NIT-Delhi/main"
+
 $coreFiles = @(
     "agent.py",
     "core/__init__.py",
