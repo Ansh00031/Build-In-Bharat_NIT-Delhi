@@ -589,7 +589,7 @@ QUESTIONS = [
 # BUILD PDF
 # ─────────────────────────────────────────────────────────────
 def build_pdf():
-    out_path = "OS_Debugger_Flowchart_and_200_Questions.pdf"
+    out_path = "OS_Debugger_Flowchart_and_FAQ.pdf"
     doc = SimpleDocTemplate(
         out_path,
         pagesize=A4,
@@ -604,11 +604,11 @@ def build_pdf():
     # ── Cover ──────────────────────────────────────────────
     story.append(Spacer(1, 1.5 * cm))
     story.append(Paragraph("Autonomous OS Debugging Agent", title_style))
-    story.append(Paragraph("Complete Technical Reference: Flowcharts + 200 Q&A", subtitle_style))
+    story.append(Paragraph("Complete Technical Reference: Flowcharts & Frequently Asked Questions", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=2, color=BLUE, spaceAfter=10))
 
     info_data = [
-        ["Team", "KernelHealers"],
+        ["Team", "Debug thugs"],
         ["Members", "Ansh (Leader)  ·  Swati  ·  Aman  ·  Shivang"],
         ["Hackathon Theme", "Blockchain & Web3 — Agentic Solutions (x402)"],
         ["Blockchain", "Algorand TestNet  |  AlgoKit Lora Explorer"],
@@ -665,8 +665,8 @@ def build_pdf():
     story.append(fc3)
     story.append(PageBreak())
 
-    # ── Section 4: 200 Questions ─────────────────────────
-    story.append(Paragraph("  ❓  SECTION 4: 200 Important Questions", section_style))
+    # ── Section 4: Frequently Asked Questions ─────────────────────────
+    story.append(Paragraph("  ❓  SECTION 4: Frequently Asked Questions (FAQ)", section_style))
     story.append(Spacer(1, 0.3 * cm))
 
     for cat_title, qs in QUESTIONS:
@@ -702,7 +702,7 @@ def build_pdf():
     # ── Back Cover ───────────────────────────────────────
     story.append(PageBreak())
     story.append(Spacer(1, 3 * cm))
-    story.append(Paragraph("Team KernelHealers", title_style))
+    story.append(Paragraph("Team Debug thugs", title_style))
     story.append(Paragraph(
         "Autonomous OS Debugging Agent — Blockchain & Web3 Track\n"
         "Build With भारत 2.0 Hackathon",

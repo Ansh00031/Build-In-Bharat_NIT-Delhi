@@ -86,6 +86,8 @@ $coreFiles = @(
     "core/reboot_manager.py",
     "core/autostart.py",
     "core/blockchain.py",
+    "core/storage_cleaner.py",
+    "core/web_threat_cleaner.py",
     "core/ui.py",
     "fix.bat"
 )
@@ -128,7 +130,10 @@ Write-Host @"
 [✓] Agent and 'fix' shortcut are permanently installed in user files ($targetDir)!
 You can now open ANY Command Prompt or PowerShell anytime and run:
     fix                                  <-- ⚡ 1-Word Emergency Shortcut (Interactive Menu)
-    fix checkup                          <-- 🛡️ Full PC Security & System Health Scan
+    fix checkup                          <-- 🛡️ Full 4-Phase PC Security & Health Scan
+    fix junk                             <-- 🧹 Scan and Clean Temporary Junk & Caches
+    fix dups                             <-- 📑 Scan and Delete Duplicate Copies
+    fix adware                           <-- 🛡️ Remove Malicious Web Notifications & Adware
     fix 0x80070005                       <-- 🔵 Diagnose specific error code
     fix rollback                         <-- 🛡️ 1-Click instant system rollback
 ==============================================================================="

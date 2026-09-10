@@ -204,3 +204,86 @@ def get_session(session_id: str) -> Optional[Dict[str, Any]]:
         return data
     except Exception:
         return None
+
+
+def get_command_history_file() -> Path:
+    """Return path to the JSON file tracking all user command activities."""
+    return get_backups_dir() / "command_history.json"
+
+
+def get_command_history_log_file() -> Path:
+    """Return path to the persistent human-readable text log of user commands."""
+    return get_backups_dir() / "command_history.log"
+
+
+def record_command_history(
+    command: str,
+    category: str,
+    action_summary: str,
+    status: str = "SUCCESS",
+    details: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Record any user-executed command into the persistent history log and JSON archive."""
+    hist_file = get_command_history_file()
+    hist_log = get_command_history_log_file()
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    entry = {
+        "timestamp": timestamp,
+        "command": command,
+        "category": category,
+        "action_summary": action_summary,
+        "status": status,
+        "details": details or {},
+    }
+
+    # 1. Update JSON archive
+    history: List[Dict[str, Any]] = []
+    if hist_file.exists():
+        try:
+            history = json.loads(hist_file.read_text(encoding="utf-8"))
+        except Exception:
+            history = []
+
+    history.insert(0, entry)
+    # Keep up to 200 recent events
+    if len(history) > 200:
+        history = history[:200]
+
+    try:
+        hist_file.write_text(json.dumps(history, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+
+    # 2. Append to human-readable log
+    try:
+        log_line = f"[{timestamp}] [{status}] [{category}] {command}: {action_summary}\n"
+        with open(hist_log, "a", encoding="utf-8") as f:
+            f.write(log_line)
+    except Exception:
+        pass
+
+
+def load_command_history() -> List[Dict[str, Any]]:
+    """Load all recorded command history entries."""
+    hist_file = get_command_history_file()
+    if hist_file.exists():
+        try:
+            return json.loads(hist_file.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    # Fallback: if command_history is empty, populate from session backups & resolved issues
+    fallback_history = []
+    sessions = list_sessions()
+    for s in sessions:
+        fallback_history.append({
+            "timestamp": str(s.get("created_at", ""))[:19].replace("T", " "),
+            "command": f"diagnose {s.get('error_code', '')}",
+            "category": "🔵 OS Diagnostic & Repair",
+            "action_summary": f"{s.get('fix_title', 'Remediation')} (Session: {s.get('session_id', '')})",
+            "status": s.get("status", "COMPLETED"),
+            "details": s,
+        })
+    return fallback_history
+

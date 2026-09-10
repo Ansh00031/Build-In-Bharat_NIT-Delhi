@@ -131,7 +131,7 @@ def create_deck(output_path: str = "Build_With_Bharat_Final_Presentation.pptx"):
     tf_m.word_wrap = True
     
     rows = [
-        ("TEAM NAME:", "KernelHealers"),
+        ("TEAM NAME:", "Debug thugs"),
         ("PROBLEM STATEMENT:", "Autonomous Diagnosis & Remediation of Operating System & Kernel Errors"),
         ("TEAM MEMBERS:", "Ansh & Team"),
         ("COLLEGE / INSTITUTION:", "Your College / University Name"),

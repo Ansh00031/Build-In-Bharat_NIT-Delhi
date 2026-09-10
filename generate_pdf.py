@@ -193,7 +193,7 @@ def build_pdf(filename="OS_Debugger.pdf"):
             Paragraph("<b>Hackathon:</b> Build With Bharat 2.0", body_style),
         ],
         [
-            Paragraph("<b>Author / Team:</b> KernelHealers (Ansh & Team)", body_style),
+            Paragraph("<b>Author / Team:</b> Debug thugs (Ansh & Team)", body_style),
             Paragraph("<b>Core Stack:</b> Python, Typer, Rich, PowerShell, OpenAI/Ollama", body_style),
         ],
     ]

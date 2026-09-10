@@ -223,19 +223,63 @@ python agent.py disable-autostart
 
 ---
 
-### 6. Interactive Command Selector Menu (1 to N)
+### 6. Interactive Command Selector Menu (1 to 17)
 
 Run the agent in friendly interactive mode with a numbered command picker:
 
 ```bash
 python agent.py menu
+# OR simply:
+fix
 ```
 
-> **Interactive Menu:** Displays numbered options `[1]` to `[12]` (Diagnose, Rollback, Solved Issues, Blockchain, etc.). Simply type the number `1` to `N` and the agent prompts for any required inputs and executes the command directly!
+> **Interactive Menu:** Displays numbered options `[1]` to `[17]` with clear descriptions. Simply type the number `1` to `17` (or command name) to execute any tool directly:
+> 
+> - `[1]` **full-checkup**: Complete 4-phase laptop security, health, adware & storage scan.
+> - `[2]` **diagnose**: Diagnose specific OS error code (e.g. `0x80070005`).
+> - `[3]` **clean-junk**: Scan and delete temporary OS clutter, crash dumps, and prefetch caches.
+> - `[4]` **scan-duplicates**: SHA-256 duplicate file detection with permission-gated removal.
+> - `[5]` **scan-web-threats**: Audit and clean rogue browser push notifications & adware hooks.
+> - `[6]` **rollback**: 1-Click instant system rollback to pre-fix snapshot.
+> - `[7]` **solved-issues**: View archived list of resolved problems.
+> - `[8]` **startup-monitor**: Live active vs resolved health monitor.
+> - `[9]` **resume**: Resume post-reboot verification.
+> - `[10]` **history**: Complete diagnostic and fix session history.
+> - `[11]` **blockchain status**: Algorand TestNet wallet & AlgoKit Lora profile.
+> - `[12]` **blockchain anchor**: Commit cryptographic SHA-256 proof to Algorand TestNet.
+> - `[13]` **check-env**: Verify environment, LLM keys, and admin rights.
+> - `[14]` **enable-autostart**: Enable automatic startup health monitor on boot.
+> - `[15]` **disable-autostart**: Disable automatic boot monitor.
+> - `[16]` **startup-log**: View historical log of startup health runs.
+> - `[17]` **install-shortcut**: Install permanent 1-word `fix` command across user & system PATH.
 
 ---
 
-### 7. View Archived Solved & Resolved Problems
+### 7. Storage & Duplicate File Manager
+
+Scan and reclaim disk space safely with explicit user confirmation:
+
+```powershell
+# Scan and clean temporary junk files and OS caches:
+python agent.py clean-junk
+
+# Scan user folders (Downloads, Documents, Desktop) for SHA-256 duplicate copies:
+python agent.py scan-duplicates
+```
+
+---
+
+### 8. Malicious Web Notifications & Adware Popup Cleaner
+
+Audit browser profiles (Chrome, Edge, Brave, Firefox) for rogue notification permissions and adware startup hooks:
+
+```powershell
+python agent.py scan-web-threats
+```
+
+---
+
+### 9. View Archived Solved & Resolved Problems
 
 View all permanently repaired system issues archived in the separate database file:
 
@@ -247,7 +291,7 @@ python agent.py solved-issues
 
 ---
 
-### 8. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
+### 10. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
 
 View your Algorand TestNet wallet, balance, and explorer profile:
 
@@ -272,7 +316,7 @@ python agent.py diagnose 0x80070005 --skip-admin-check --anchor
 
 ---
 
-### 7. Check Environment & Security Status
+### 11. Check Environment & Security Status
 
 ```powershell
 python agent.py check-env
@@ -284,7 +328,9 @@ python agent.py check-env
 
 ```
 os-debug-agent/
-├── agent.py               # Main CLI entrypoint (Typer app)
+├── agent.py               # Main CLI entrypoint (Typer app & interactive selector)
+├── fix.bat                # 1-Word emergency shortcut script
+├── bootstrap.ps1          # 1-Line cloud recovery bootstrapper
 ├── requirements.txt       # Python dependencies (typer, rich, openai, pydantic)
 ├── .env.example           # Environment template
 ├── .env                   # Local configuration
@@ -298,6 +344,10 @@ os-debug-agent/
     ├── executor.py        # Secure read-only command runner with safety filters
     ├── remediation.py     # Subprocess script runner with auto-cleanup
     ├── snapshot.py        # Pre-fix snapshot and rollback engine
+    ├── storage_cleaner.py # Junk cache cleaner & SHA-256 duplicate file detector
+    ├── web_threat_cleaner.py # Browser push notification & adware popup remover
+    ├── autostart.py       # Windows startup task manager & 'fix' installer
+    ├── blockchain.py      # Algorand TestNet & AlgoKit Lora anchor engine
     ├── llm.py             # Multi-stage AI prompt engineering & reasoning engine
     └── ui.py              # Rich UI formatting, banners, tables, and spinners
 ```

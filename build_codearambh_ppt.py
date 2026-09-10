@@ -155,7 +155,7 @@ def build_presentation():
 
     team_meta = [
         ("🏆 Track / Theme", "AI & Autonomous Systems / Systems Reliability"),
-        ("👥 Team Name", "KernelHealers"),
+        ("👥 Team Name", "Debug thugs"),
         ("👤 Team Leader & Dev", "Ansh Prajapati"),
         ("🏫 College", "Sanjay Ghodawat University (SGU)"),
         ("✉️ Email", "ansh.prajapati@example.com"),

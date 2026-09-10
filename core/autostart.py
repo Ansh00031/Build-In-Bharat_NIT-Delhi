@@ -153,12 +153,12 @@ def get_fix_shortcut_content() -> str:
         return f"""@echo off
 setlocal enabledelayedexpansion
 
-title Autonomous OS Debugging Agent - Emergency Fix (KernelHealers)
+title Autonomous OS Debugging Agent - Emergency Fix (Debug thugs)
 color 0A
 
 echo ===============================================================================
 echo     AUTONOMOUS OS DEBUGGING AGENT - 1-WORD EMERGENCY RECOVERY (fix)
-echo     Team: KernelHealers - Build With Bharat 2.0
+echo     Team: Debug thugs - Build With Bharat 2.0
 echo ===============================================================================
 echo.
 
@@ -296,7 +296,7 @@ endlocal
 # Autonomous OS Debugging Agent - 1-Word Emergency Recovery (fix)
 echo "==============================================================================="
 echo "    AUTONOMOUS OS DEBUGGING AGENT - 1-WORD EMERGENCY RECOVERY (fix)"
-echo "    Team: KernelHealers | Build With Bharat 2.0"
+echo "    Team: Debug thugs | Build With Bharat 2.0"
 echo "==============================================================================="
 
 PY_BIN="$(command -v python3 || command -v python)"

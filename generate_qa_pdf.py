@@ -521,7 +521,7 @@ QA_DATA = [
 
 # ── Build PDF ────────────────────────────────────────────────
 def build_qa_pdf():
-    out = "OS_Debugger_QA_200_Questions.pdf"
+    out = "OS_Debugger_Frequently_Asked_Questions.pdf"
     doc = SimpleDocTemplate(
         out, pagesize=A4,
         rightMargin=1.8*cm, leftMargin=1.8*cm,
@@ -532,17 +532,17 @@ def build_qa_pdf():
     # ── Cover ────────────────────────────────────────────────
     story.append(Spacer(1, 1.5*cm))
     story.append(Paragraph("Autonomous OS Debugging Agent", title_s))
-    story.append(Paragraph("200 Questions & Answers — Easy Language Guide", sub_s))
+    story.append(Paragraph("Frequently Asked Questions (FAQ) — Comprehensive Technical & Evaluation Guide", sub_s))
     story.append(HRFlowable(width="100%", thickness=2, color=BLUE, spaceAfter=12))
 
     cover_data = [
-        ["Team", "KernelHealers"],
+        ["Team", "Debug thugs"],
         ["Members", "Ansh (Leader)  ·  Swati  ·  Aman  ·  Shivang"],
         ["Hackathon", "Build With Bharat 2.0"],
         ["Theme", "Blockchain & Web3 — Agentic Solutions (x402)"],
         ["Blockchain", "Algorand TestNet  |  lora.algokit.io/testnet"],
         ["GitHub", "github.com/Ansh00031/Build-In-Bharat_NIT-Delhi"],
-        ["Total Questions", "200 across 10 categories with full easy-language answers"],
+        ["Total Questions", "Comprehensive FAQ covering all 10 technical categories with full answers"],
     ]
     ct = Table(cover_data, colWidths=[4*cm, 12.5*cm])
     ct.setStyle(TableStyle([
@@ -612,7 +612,7 @@ def build_qa_pdf():
     # ── Back Cover ──────────────────────────────────────────
     story.append(PageBreak())
     story.append(Spacer(1, 3*cm))
-    story.append(Paragraph("Team KernelHealers", title_s))
+    story.append(Paragraph("Team Debug thugs", title_s))
     story.append(Paragraph(
         "Autonomous OS Debugging Agent\nBlockchain & Web3 — Agentic Solutions Track",
         sub_s))

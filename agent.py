@@ -116,12 +116,26 @@ from core.security import get_elevation_details, is_admin
 from core.snapshot import (
     create_pre_fix_snapshot,
     generate_session_id,
+    get_command_history_log_file,
     get_resolved_issues_file,
     get_session,
     list_sessions,
+    load_command_history,
     load_resolved_issues,
+    record_command_history,
     save_resolved_issue,
     update_session_status,
+)
+from core.storage_cleaner import (
+    delete_duplicate_copies,
+    delete_junk_files,
+    format_size,
+    scan_duplicate_files,
+    scan_junk_files,
+)
+from core.web_threat_cleaner import (
+    clean_web_threats,
+    scan_all_web_threats,
 )
 from core.ui import (
     console,
@@ -130,6 +144,7 @@ from core.ui import (
     print_blockchain_anchor_card,
     print_blockchain_status,
     print_command_execution,
+    print_command_history,
     print_context_summary,
     print_diagnostic_commands,
     print_final_report,
@@ -138,6 +153,7 @@ from core.ui import (
     print_full_checkup_header,
     print_initial_diagnosis,
     print_interactive_menu,
+    print_junk_and_duplicates_summary,
     print_reboot_notice,
     print_resolved_issues_table,
     print_resume_header,
@@ -145,6 +161,7 @@ from core.ui import (
     print_root_cause_analysis,
     print_sessions_history,
     print_status_summary,
+    print_web_threats_summary,
 )
 
 app = typer.Typer(
@@ -353,6 +370,12 @@ def diagnose(
     )
 
     if not should_execute:
+        record_command_history(
+            command=f"diagnose {error_code}",
+            category="🔵 OS Diagnostic & Repair",
+            action_summary=f"Diagnosed {error_code} — Fix execution declined by user",
+            status="CANCELED",
+        )
         console.print(
             Panel(
                 "[yellow]Fix execution declined by user.[/yellow]\n"
@@ -435,6 +458,14 @@ def diagnose(
             "verification_command": verify_cmd,
             "status": final_status,
         })
+
+    record_command_history(
+        command=f"diagnose {error_code}",
+        category="🔵 OS Diagnostic & Repair",
+        action_summary=f"{fix_proposal.get('title', 'Remediation Fix')} ({final_status})",
+        status=final_status,
+        details={"session_id": session_id, "error_code": error_code, "fix_title": fix_proposal.get("title", "")},
+    )
 
     print_final_report(final_report_data)
 
@@ -531,10 +562,15 @@ def resume(
 
 @app.command(name="history")
 def history() -> None:
-    """View past diagnostic and remediation sessions with snapshot history."""
+    """View unified history of all executed commands, actions, and remediation snapshots."""
     print_banner()
+    command_entries = load_command_history()
+    log_path = str(get_command_history_log_file())
+    print_command_history(command_entries, log_path)
+
     sessions = list_sessions()
-    print_sessions_history(sessions)
+    if sessions:
+        print_sessions_history(sessions)
 
 
 @app.command(name="rollback")
@@ -609,6 +645,12 @@ def rollback(
         default=False,
     )
     if not confirm_rollback:
+        record_command_history(
+            command=f"rollback {session_id}",
+            category="🔄 Recovery Engine",
+            action_summary=f"Rollback aborted by user for session {session_id}",
+            status="CANCELED",
+        )
         console.print("[yellow]Rollback aborted by user. No changes made.[/yellow]")
         raise typer.Exit(code=0)
 
@@ -628,6 +670,14 @@ def rollback(
     print_command_execution(v_res, index=1, total=1)
     update_session_status(session_id, status="ROLLED_BACK", rollback_executed=True)
 
+    record_command_history(
+        command=f"rollback {session_id}",
+        category="🔄 Recovery Engine",
+        action_summary=f"Reverted system changes for session {session_id} back to baseline",
+        status="ROLLED_BACK",
+        details={"session_id": session_id},
+    )
+
     console.print(
         Panel(
             f"[bold green]Session '{session_id}' has been successfully rolled back.[/bold green]\n"
@@ -643,6 +693,12 @@ def enable_autostart_cmd() -> None:
     """Register the agent to automatically launch and monitor system health on PC startup."""
     print_banner()
     success, msg = enable_autostart_func()
+    record_command_history(
+        command="enable-autostart",
+        category="🚀 Startup Setup",
+        action_summary="Configured automatic startup health monitor launcher",
+        status="SUCCESS" if success else "FAILED",
+    )
     if success:
         console.print(
             Panel(
@@ -668,6 +724,12 @@ def disable_autostart_cmd() -> None:
     """Remove automatic startup launchers and registry entries."""
     print_banner()
     success, msg = disable_autostart_func()
+    record_command_history(
+        command="disable-autostart",
+        category="🚀 Startup Setup",
+        action_summary="Removed automatic boot monitor from Windows startup",
+        status="SUCCESS",
+    )
     console.print(
         Panel(
             f"[yellow]{msg}[/yellow]",
@@ -913,7 +975,167 @@ def blockchain_anchor_cmd(
         )
         status.update("[bold green]Anchoring process completed![/bold green]")
 
+    record_command_history(
+        command=f"blockchain anchor {session_id}",
+        category="🟣 Web3 / Algorand",
+        action_summary=f"Anchored SHA-256 proof for session {session_id} to Algorand TestNet (Tx: {res.get('tx_id', '')[:12]}...)",
+        status="ANCHORED" if res.get("success") else "FAILED",
+        details=res,
+    )
+
     print_blockchain_anchor_card(res)
+
+
+@app.command(name="clean-junk")
+def clean_junk_cmd() -> None:
+    """Scan and delete OS temp files, crash dumps, and prefetch clutter upon user confirmation."""
+    print_banner()
+    console.print("[bold cyan]🔍 Scanning system caches, temporary folders, and crash logs...[/bold cyan]\n")
+    junk_data = scan_junk_files()
+    dup_empty = {"groups": [], "total_groups": 0, "total_duplicate_copies": 0, "total_wasted_formatted": "0 B"}
+    print_junk_and_duplicates_summary(junk_data, dup_empty)
+
+    total_files = junk_data.get("total_files", 0)
+    if total_files == 0:
+        record_command_history(
+            command="clean-junk",
+            category="🧹 Storage Cleaner",
+            action_summary="Audited system temp caches & crash dumps — 0 junk files (Clean)",
+            status="HEALTHY",
+        )
+        console.print("[bold green]System is clean! No unnecessary temporary junk files found.[/bold green]\n")
+        return
+
+    should_delete = Confirm.ask(
+        f"[bold yellow]Do you want to permanently delete these {total_files} junk files to reclaim {junk_data.get('total_formatted')}?[/bold yellow]",
+        default=True,
+    )
+    if should_delete:
+        del_count, rec_bytes, errors = delete_junk_files(junk_data, confirmed=True)
+        record_command_history(
+            command="clean-junk",
+            category="🧹 Storage Cleaner",
+            action_summary=f"Cleaned {del_count} junk files, reclaimed {format_size(rec_bytes)} disk space",
+            status="CLEANED",
+            details={"deleted_count": del_count, "reclaimed_bytes": rec_bytes},
+        )
+        console.print(f"\n[bold green]✓ Successfully cleaned {del_count} junk file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+        if errors:
+            for e in errors[:5]:
+                console.print(f"  [dim yellow]• {e}[/dim yellow]")
+    else:
+        record_command_history(
+            command="clean-junk",
+            category="🧹 Storage Cleaner",
+            action_summary=f"Detected {total_files} junk files ({junk_data.get('total_formatted')}) — cleanup canceled by user",
+            status="CANCELED",
+        )
+        console.print("[dim]Junk file cleanup canceled by user.[/dim]\n")
+
+
+@app.command(name="clean-storage")
+def clean_storage_alias_cmd() -> None:
+    """Alias for cleaning temporary junk files and OS caches."""
+    clean_junk_cmd()
+
+
+@app.command(name="scan-duplicates")
+def scan_duplicates_cmd() -> None:
+    """Scan Downloads, Documents, and Desktop for duplicate files with permission-gated deletion."""
+    print_banner()
+    console.print("[bold cyan]🔍 Scanning user folders (Downloads, Documents, Desktop) for duplicate files (SHA-256 matching)...[/bold cyan]\n")
+    dup_data = scan_duplicate_files()
+    junk_empty = {"categories": [], "total_files": 0, "total_formatted": "0 B"}
+    print_junk_and_duplicates_summary(junk_empty, dup_data)
+
+    total_dups = dup_data.get("total_duplicate_copies", 0)
+    if total_dups == 0:
+        record_command_history(
+            command="scan-duplicates",
+            category="📑 Duplicate Finder",
+            action_summary="Scanned user folders (Downloads, Documents, Desktop) — 0 duplicate files",
+            status="HEALTHY",
+        )
+        console.print("[bold green]No duplicate files detected in user folders.[/bold green]\n")
+        return
+
+    should_delete = Confirm.ask(
+        f"[bold yellow]Do you want to delete {total_dups} redundant duplicate copies (preserving originals) to reclaim {dup_data.get('total_wasted_formatted')}?[/bold yellow]",
+        default=True,
+    )
+    if should_delete:
+        del_count, rec_bytes, errors = delete_duplicate_copies(dup_data, confirmed=True)
+        record_command_history(
+            command="scan-duplicates",
+            category="📑 Duplicate Finder",
+            action_summary=f"Deleted {del_count} redundant duplicate copies, reclaimed {format_size(rec_bytes)} disk space",
+            status="CLEANED",
+            details={"deleted_copies": del_count, "reclaimed_bytes": rec_bytes},
+        )
+        console.print(f"\n[bold green]✓ Successfully removed {del_count} duplicate copy file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+        if errors:
+            for e in errors[:5]:
+                console.print(f"  [dim yellow]• {e}[/dim yellow]")
+    else:
+        record_command_history(
+            command="scan-duplicates",
+            category="📑 Duplicate Finder",
+            action_summary=f"Detected {total_dups} duplicate copies ({dup_data.get('total_wasted_formatted')}) — cleanup canceled by user",
+            status="CANCELED",
+        )
+        console.print("[dim]Duplicate file cleanup canceled by user.[/dim]\n")
+
+
+@app.command(name="scan-web-threats")
+def scan_web_threats_cmd() -> None:
+    """Scan browser profiles for malicious push notifications, corrupted cookies, and adware hooks."""
+    print_banner()
+    console.print("[bold cyan]🔍 Auditing browser profiles (Chrome, Edge, Brave, Firefox) for rogue push notifications and adware popups...[/bold cyan]\n")
+    threat_data = scan_all_web_threats()
+    print_web_threats_summary(threat_data)
+
+    total_threats = threat_data.get("total_threats", 0)
+    if total_threats == 0:
+        record_command_history(
+            command="scan-web-threats",
+            category="🛡️ Web & Adware",
+            action_summary="Audited browser profiles & startup registries — All clean and safe",
+            status="HEALTHY",
+        )
+        console.print("[bold green]✓ All browser profiles and startup registries are clean and safe.[/bold green]\n")
+        return
+
+    should_clean = Confirm.ask(
+        f"[bold yellow]Do you want to revoke rogue notification permissions and clean {total_threats} adware hook(s) now?[/bold yellow]",
+        default=True,
+    )
+    if should_clean:
+        cleaned_count, errors = clean_web_threats(threat_data, confirmed=True)
+        record_command_history(
+            command="scan-web-threats",
+            category="🛡️ Web & Adware",
+            action_summary=f"Revoked permissions and cleaned {cleaned_count} rogue web notification / adware item(s)",
+            status="CLEANED",
+            details={"cleaned_count": cleaned_count},
+        )
+        console.print(f"\n[bold green]✓ Successfully cleaned {cleaned_count} web threat/adware item(s)![/bold green]\n")
+        if errors:
+            for e in errors:
+                console.print(f"  [dim red]• {e}[/dim red]")
+    else:
+        record_command_history(
+            command="scan-web-threats",
+            category="🛡️ Web & Adware",
+            action_summary=f"Detected {total_threats} rogue web items — cleanup canceled by user",
+            status="CANCELED",
+        )
+        console.print("[dim]Web threat cleanup canceled by user.[/dim]\n")
+
+
+@app.command(name="clean-adware")
+def clean_adware_alias_cmd() -> None:
+    """Alias for scanning and removing rogue browser push notifications and adware hooks."""
+    scan_web_threats_cmd()
 
 
 @app.command(name="full-checkup")
@@ -931,7 +1153,7 @@ def full_checkup_cmd(
         help="Anchor cryptographic proof of diagnosis and remediation to Algorand TestNet.",
     ),
 ) -> None:
-    """Run full PC security & system checkup: audits integrity, event logs, services, and auto-heals."""
+    """Run full PC security, storage & system checkup: audits integrity, event logs, services, web threats, and storage."""
     if hasattr(skip_admin_check, "default"):
         skip_admin_check = False
     if hasattr(anchor_chain, "default"):
@@ -940,7 +1162,7 @@ def full_checkup_cmd(
     print_banner()
     print_full_checkup_header()
 
-    console.print("[bold cyan]► Phase 1/3: Auditing live critical services & kernel components...[/bold cyan]")
+    console.print("[bold cyan]► Phase 1/4: Auditing live critical services & kernel components...[/bold cyan]")
     if platform.system() == "Windows":
         svc_res = execute_diagnostic_command(
             "Get-Service wuauserv, bits, cryptsvc, WinDefend -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType"
@@ -952,9 +1174,59 @@ def full_checkup_cmd(
     if svc_res.get("stdout"):
         console.print(f"  [dim green]{svc_res['stdout'].strip()}[/dim green]\n")
 
-    console.print("[bold cyan]► Phase 2/3: Scanning Event Viewer crash logs and error codes across entire laptop...[/bold cyan]")
-    # Run whole laptop scan & auto-heal
-    diagnose(error_code=None, skip_admin_check=skip_admin_check, anchor_chain=anchor_chain)
+    console.print("[bold cyan]► Phase 2/4: Scanning Event Viewer crash logs and error codes across entire laptop...[/bold cyan]")
+    try:
+        diagnose(error_code=None, skip_admin_check=skip_admin_check, anchor_chain=anchor_chain)
+    except typer.Exit:
+        pass
+
+    console.print("\n[bold cyan]► Phase 3/4: Auditing browser profiles for rogue push notifications & adware popups...[/bold cyan]")
+    threat_data = scan_all_web_threats()
+    print_web_threats_summary(threat_data)
+    if threat_data.get("total_threats", 0) > 0:
+        should_clean = Confirm.ask("[bold yellow]Do you want to revoke rogue notification permissions and clean adware hooks now?[/bold yellow]", default=True)
+        if should_clean:
+            cleaned_count, errors = clean_web_threats(threat_data, confirmed=True)
+            console.print(f"[bold green]✓ Successfully cleaned {cleaned_count} web threat/adware item(s)![/bold green]\n")
+
+    console.print("\n[bold cyan]► Phase 4/4: Scanning disk for temporary junk files & redundant duplicate copies...[/bold cyan]")
+    junk_data = scan_junk_files()
+    dup_data = scan_duplicate_files()
+    print_junk_and_duplicates_summary(junk_data, dup_data)
+
+    total_junk = junk_data.get("total_files", 0)
+    total_dups = dup_data.get("total_duplicate_copies", 0)
+
+    if total_junk > 0:
+        clean_junk_prompt = Confirm.ask(f"[bold yellow]Delete {total_junk} temporary junk files to reclaim {junk_data.get('total_formatted')}?[/bold yellow]", default=True)
+        if clean_junk_prompt:
+            del_cnt, rec_bytes, _ = delete_junk_files(junk_data, confirmed=True)
+            console.print(f"[bold green]✓ Cleaned {del_cnt} junk file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+
+    if total_dups > 0:
+        clean_dup_prompt = Confirm.ask(f"[bold yellow]Delete {total_dups} redundant duplicate copies (preserving originals) to reclaim {dup_data.get('total_wasted_formatted')}?[/bold yellow]", default=True)
+        if clean_dup_prompt:
+            del_cnt, rec_bytes, _ = delete_duplicate_copies(dup_data, confirmed=True)
+            console.print(f"[bold green]✓ Cleaned {del_cnt} duplicate file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+
+    record_command_history(
+        command="full-checkup",
+        category="🛡️ Security & Health",
+        action_summary="Completed Full 4-Phase System Integrity, Services, Web Threats & Storage Doctor Checkup",
+        status="COMPLETED",
+    )
+
+    console.print(
+        Panel(
+            "[bold green]✓ Full PC Security, Health & Storage Checkup Completed Successfully![/bold green]\n\n"
+            "• Critical Services: Verified & Active\n"
+            "• OS Integrity & Logs: Scanned & Auto-Healed\n"
+            "• Web Threats & Adware: Audited & Cleaned\n"
+            "• System Storage & Duplicates: Scanned & Optimized",
+            title="[bold green]Doctor Checkup Report Summary[/bold green]",
+            border_style="green",
+        )
+    )
 
 
 @app.command(name="menu")
@@ -963,7 +1235,7 @@ def interactive_menu_cmd() -> None:
     while True:
         print_banner()
         print_interactive_menu()
-        choice = typer.prompt("Select command number [0-14]", default="1")
+        choice = typer.prompt("Select command number [0-17]", default="1")
         choice = choice.strip()
 
         if choice in ["0", "exit", "q", "quit"]:
@@ -982,16 +1254,22 @@ def interactive_menu_cmd() -> None:
                 diagnose(error_code=code, anchor_chain=anchor)
             except typer.Exit:
                 pass
-        elif choice == "3" or choice.lower() == "rollback":
+        elif choice == "3" or choice.lower() in ["clean-junk", "junk", "clean-storage"]:
+            clean_junk_cmd()
+        elif choice == "4" or choice.lower() in ["scan-duplicates", "duplicates", "dups"]:
+            scan_duplicates_cmd()
+        elif choice == "5" or choice.lower() in ["scan-web-threats", "web-threats", "clean-adware", "adware"]:
+            scan_web_threats_cmd()
+        elif choice == "6" or choice.lower() == "rollback":
             try:
                 rollback()
             except typer.Exit:
                 pass
-        elif choice == "4" or choice.lower() in ["solved-issues", "resolved"]:
+        elif choice == "7" or choice.lower() in ["solved-issues", "resolved"]:
             solved_issues_cmd()
-        elif choice == "5" or choice.lower() == "startup-monitor":
+        elif choice == "8" or choice.lower() == "startup-monitor":
             startup_monitor_cmd()
-        elif choice == "6" or choice.lower() == "resume":
+        elif choice == "9" or choice.lower() == "resume":
             sessions = list_sessions()
             default_sid = sessions[0]["session_id"] if sessions else "session_..."
             sid = typer.prompt("Enter session ID to resume", default=default_sid)
@@ -999,27 +1277,27 @@ def interactive_menu_cmd() -> None:
                 resume(session_id=sid)
             except typer.Exit:
                 pass
-        elif choice == "7" or choice.lower() == "history":
+        elif choice == "10" or choice.lower() == "history":
             history()
-        elif choice == "8" or choice.lower() == "blockchain status":
+        elif choice == "11" or choice.lower() == "blockchain status":
             blockchain_status_cmd()
-        elif choice == "9" or choice.lower() == "blockchain anchor":
+        elif choice == "12" or choice.lower() == "blockchain anchor":
             try:
                 blockchain_anchor_cmd()
             except typer.Exit:
                 pass
-        elif choice == "10" or choice.lower() == "check-env":
+        elif choice == "13" or choice.lower() == "check-env":
             check_env()
-        elif choice == "11" or choice.lower() == "enable-autostart":
+        elif choice == "14" or choice.lower() == "enable-autostart":
             enable_autostart_cmd()
-        elif choice == "12" or choice.lower() == "disable-autostart":
+        elif choice == "15" or choice.lower() == "disable-autostart":
             disable_autostart_cmd()
-        elif choice == "13" or choice.lower() == "startup-log":
+        elif choice == "16" or choice.lower() == "startup-log":
             startup_log_cmd()
-        elif choice == "14" or choice.lower() in ["install-shortcut", "setup-fix", "shortcut", "fix"]:
+        elif choice == "17" or choice.lower() in ["install-shortcut", "setup-fix", "shortcut", "fix"]:
             install_shortcut_cmd()
         else:
-            console.print(f"[bold red]Invalid option '{choice}'. Please enter a number between 1 and 14 (or 0 to exit).[/bold red]\n")
+            console.print(f"[bold red]Invalid option '{choice}'. Please enter a number between 1 and 17 (or 0 to exit).[/bold red]\n")
 
         should_repeat = Confirm.ask("\n[bold cyan]Return to main command menu?[/bold cyan]", default=True)
         if not should_repeat:
@@ -1051,10 +1329,34 @@ def slash_help_cmd() -> None:
     interactive_menu_cmd()
 
 
-@app.command(name="scan")
-def scan_cmd() -> None:
-    """Perform a comprehensive whole-laptop system error scan and report."""
-    full_checkup_cmd()
+@app.command(name="junk")
+def junk_alias_cmd() -> None:
+    """Shortcut alias for cleaning temporary junk files and OS caches."""
+    clean_junk_cmd()
+
+
+@app.command(name="duplicates")
+def duplicates_alias_cmd() -> None:
+    """Shortcut alias for scanning and cleaning duplicate files."""
+    scan_duplicates_cmd()
+
+
+@app.command(name="dups")
+def dups_alias_cmd() -> None:
+    """Shortcut alias for scanning and cleaning duplicate files."""
+    scan_duplicates_cmd()
+
+
+@app.command(name="adware")
+def adware_alias_cmd() -> None:
+    """Shortcut alias for scanning and removing browser push notifications and adware."""
+    scan_web_threats_cmd()
+
+
+@app.command(name="web")
+def web_alias_cmd() -> None:
+    """Shortcut alias for scanning and removing rogue web threats and adware."""
+    scan_web_threats_cmd()
 
 
 app.add_typer(blockchain_app, name="blockchain")

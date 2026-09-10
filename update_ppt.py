@@ -29,7 +29,7 @@ SLIDE_DATA = {
     1: {
         "title": "Autonomous OS Debugging Agent",
         "subtitle": "AI-Powered System Diagnostics, Safe Remediation & Zero-Risk Rollback",
-        "team_name": "KernelHealers",
+        "team_name": "Debug thugs",
         "problem_statement": "Autonomous Diagnosis & Remediation of Operating System Errors using AI Agents",
         "members": "Ansh & Team",
         "college": "Your College Name",

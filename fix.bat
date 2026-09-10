@@ -1,12 +1,12 @@
 @echo off
 setlocal enabledelayedexpansion
 
-title Autonomous OS Debugging Agent - Emergency Fix (KernelHealers)
+title Autonomous OS Debugging Agent - Emergency Fix (Debug thugs)
 color 0A
 
 echo ===============================================================================
 echo     AUTONOMOUS OS DEBUGGING AGENT - 1-WORD EMERGENCY RECOVERY (fix)
-echo     Team: KernelHealers - Build With Bharat 2.0
+echo     Team: Debug thugs - Build With Bharat 2.0
 echo ===============================================================================
 echo.
 
@@ -80,20 +80,20 @@ if exist "%CD%\agent.py" (
     set "AGENT_PY=%CD%\agent.py"
     goto :execute
 )
-if exist "%USERPROFILE%\os-debug-agent\agent.py" (
-    set "AGENT_PY=%USERPROFILE%\os-debug-agent\agent.py"
-    goto :execute
-)
-if exist "C:\Users\%USERNAME%\os-debug-agent\agent.py" (
-    set "AGENT_PY=C:\Users\%USERNAME%\os-debug-agent\agent.py"
-    goto :execute
-)
 if exist "C:\Users\ansh6\.gemini\antigravity\scratch\os-debug-agent\agent.py" (
     set "AGENT_PY=C:\Users\ansh6\.gemini\antigravity\scratch\os-debug-agent\agent.py"
     goto :execute
 )
 if exist "C:\Users\%USERNAME%\.gemini\antigravity\scratch\os-debug-agent\agent.py" (
     set "AGENT_PY=C:\Users\%USERNAME%\.gemini\antigravity\scratch\os-debug-agent\agent.py"
+    goto :execute
+)
+if exist "%USERPROFILE%\os-debug-agent\agent.py" (
+    set "AGENT_PY=%USERPROFILE%\os-debug-agent\agent.py"
+    goto :execute
+)
+if exist "C:\Users\%USERNAME%\os-debug-agent\agent.py" (
+    set "AGENT_PY=C:\Users\%USERNAME%\os-debug-agent\agent.py"
     goto :execute
 )
 if exist "%LOCALAPPDATA%\os-debug-agent\agent.py" (
