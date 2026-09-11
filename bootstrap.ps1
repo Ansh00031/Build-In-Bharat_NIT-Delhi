@@ -60,9 +60,27 @@ if ($pythonExe) {
     $zipPath = "$targetDir\python_portable.zip"
     $pyDir = "$targetDir\python_env"
     
+    # 1. Extract embedded Python
     Invoke-WebRequest -Uri $portableUrl -OutFile $zipPath -UseBasicParsing
     Expand-Archive -Path $zipPath -DestinationPath $pyDir -Force
     $pythonExe = "$pyDir\python.exe"
+
+    # 2. Enable site-packages in embedded Python ._pth file
+    Get-ChildItem -Path $pyDir -Filter "*._pth" | ForEach-Object {
+        $content = Get-Content $_.FullName
+        $content = $content -replace '#import site', 'import site'
+        Set-Content $_.FullName $content
+    }
+
+    # 3. Bootstrap pip in embedded Python
+    if (-not (Test-Path "$pyDir\Scripts\pip.exe")) {
+        Write-Host "[*] Bootstrapping pip for portable Python environment..." -ForegroundColor DarkGray
+        $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
+        $getPipPath = "$pyDir\get-pip.py"
+        Invoke-WebRequest -Uri $getPipUrl -OutFile $getPipPath -UseBasicParsing
+        & $pythonExe $getPipPath --no-warn-script-location --quiet
+    }
+
     Write-Host "[✓] Portable Python initialized: $pythonExe" -ForegroundColor Green
 }
 
