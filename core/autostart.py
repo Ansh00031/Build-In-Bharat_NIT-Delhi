@@ -345,6 +345,9 @@ REM 3. If Python AND agent.py are available -> Run Python AI Agent Engine
 if defined AGENT_PY (
     if defined PY_EXE (
         if "!PY_EXE!"=="py -3" set "PY_EXE=py"
+        set "AGENT_DIR=%~dp0"
+        for %%F in ("!AGENT_PY!") do set "AGENT_DIR=%%~dpF"
+        set "PYTHONPATH=!AGENT_DIR!;!AGENT_DIR!Lib\site-packages;!PYTHONPATH!"
         echo [INFO] Python Runtime : !PY_EXE!
         echo [INFO] Agent Engine   : !AGENT_PY!
         echo.

@@ -117,6 +117,9 @@ if ($pythonExe) {
         $pthLines = @(
             "python310.zip",
             ".",
+            "..",
+            "$targetDir",
+            "$pyDir\Lib\site-packages",
             "Lib",
             "Lib\site-packages",
             "import site"

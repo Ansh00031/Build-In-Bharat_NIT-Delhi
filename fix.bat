@@ -163,6 +163,10 @@ if exist "%CD%\agent.py" (
     set "AGENT_PY=%CD%\agent.py"
     goto :execute
 )
+if exist "C:\Users\ansh6\.gemini\antigravity\scratch\os-debug-agent\agent.py" (
+    set "AGENT_PY=C:\Users\ansh6\.gemini\antigravity\scratch\os-debug-agent\agent.py"
+    goto :execute
+)
 if exist "%USERPROFILE%\os-debug-agent\agent.py" (
     set "AGENT_PY=%USERPROFILE%\os-debug-agent\agent.py"
     goto :execute
@@ -189,6 +193,9 @@ REM 3. If Python AND agent.py are available -> Run Python AI Agent Engine
 if defined AGENT_PY (
     if defined PY_EXE (
         if "!PY_EXE!"=="py -3" set "PY_EXE=py"
+        set "AGENT_DIR=%~dp0"
+        for %%F in ("!AGENT_PY!") do set "AGENT_DIR=%%~dpF"
+        set "PYTHONPATH=!AGENT_DIR!;!AGENT_DIR!Lib\site-packages;!PYTHONPATH!"
         echo [INFO] Python Runtime : !PY_EXE!
         echo [INFO] Agent Engine   : !AGENT_PY!
         echo.

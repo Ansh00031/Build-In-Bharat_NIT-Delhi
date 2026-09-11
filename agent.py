@@ -15,6 +15,11 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+# Ensure project root directory is always in sys.path (supports execution from any working directory)
+_AGENT_ROOT = Path(__file__).resolve().parent
+if str(_AGENT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_AGENT_ROOT))
+
 # Auto-install dependencies if launched in a fresh environment
 try:
     import typer
