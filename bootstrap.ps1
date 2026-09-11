@@ -29,59 +29,114 @@ Set-Location $targetDir
 Write-Host "[1/4] Permanent user workspace set to: $targetDir" -ForegroundColor Green
 
 # 2. Check for Python on the machine or in internal drives (C:, D:, etc.)
-Write-Host "[2/4] Searching for Python runtime across system drives..." -ForegroundColor Cyan
+Write-Host "[2/4] Searching for functional Python runtime across system..." -ForegroundColor Cyan
 $pythonExe = $null
 
-# Check current PATH
-$sysPython = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
-if ($sysPython) {
-    $pythonExe = $sysPython
+function Test-PythonCandidate($path) {
+    if (-not $path) { return $false }
+    if ($path -like "*\AppData\Local\Microsoft\WindowsApps\*") { return $false }
+    if (-not (Test-Path $path)) { return $false }
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $path
+        $psi.Arguments = '-c "import sys; print(''PYTHON_OK'')"'
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow = $true
+        $proc = [System.Diagnostics.Process]::Start($psi)
+        $procOut = $proc.StandardOutput.ReadToEnd()
+        $proc.WaitForExit(4000)
+        if ($proc.ExitCode -eq 0 -and $procOut -match "PYTHON_OK") {
+            return $true
+        }
+    } catch {}
+    return $false
 }
 
-# Scan offline drives if inside WinRE (where boot drive is C: or D:)
+# 2.1 Check if local portable Python already exists in workspace
+if (Test-PythonCandidate "$targetDir\python_env\python.exe") {
+    $pythonExe = "$targetDir\python_env\python.exe"
+}
+
+# 2.2 Check py launcher
+if (-not $pythonExe) {
+    $pyCmd = (Get-Command py.exe -ErrorAction SilentlyContinue).Source
+    if ($pyCmd -and (Test-PythonCandidate $pyCmd)) {
+        $pythonExe = $pyCmd
+    }
+}
+
+# 2.3 Check system PATH python.exe (strictly filtering out WindowsApps fake alias)
+if (-not $pythonExe) {
+    $allPython = Get-Command python.exe -All -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+    foreach ($p in $allPython) {
+        if (Test-PythonCandidate $p) {
+            $pythonExe = $p
+            break
+        }
+    }
+}
+
+# 2.4 Scan common drive locations
 if (-not $pythonExe) {
     $searchDrives = @("C:", "D:", "E:", "X:")
     foreach ($drive in $searchDrives) {
         if (Test-Path $drive) {
-            $candidates = Get-ChildItem -Path "$drive\Users\*\AppData\Local\Programs\Python\Python*\python.exe", "$drive\Python*\python.exe", "$drive\Program Files\Python*\python.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-            if ($candidates) {
-                $pythonExe = $candidates[0]
-                break
+            $candidates = Get-ChildItem -Path "$drive\Users\*\AppData\Local\Programs\Python\Python*\python.exe", "$drive\Python*\python.exe", "$drive\Program Files\Python*\python.exe", "$drive\ProgramData\*\python.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+            foreach ($c in $candidates) {
+                if (Test-PythonCandidate $c) {
+                    $pythonExe = $c
+                    break
+                }
             }
+            if ($pythonExe) { break }
         }
     }
 }
 
 if ($pythonExe) {
-    Write-Host "[✓] Found Python runtime: $pythonExe" -ForegroundColor Green
+    Write-Host "[✓] Found verified Python runtime: $pythonExe" -ForegroundColor Green
 } else {
-    Write-Host "[!] No local Python found. Downloading lightweight portable Python runtime (~15MB)..." -ForegroundColor Yellow
+    Write-Host "[!] No functional Python runtime found on system." -ForegroundColor Yellow
+    Write-Host "[*] Downloading lightweight portable Python runtime (~15MB)..." -ForegroundColor Cyan
     $portableUrl = "https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip"
     $zipPath = "$targetDir\python_portable.zip"
     $pyDir = "$targetDir\python_env"
     
     # 1. Extract embedded Python
+    if (!(Test-Path $pyDir)) {
+        New-Item -ItemType Directory -Path $pyDir -Force | Out-Null
+    }
     Invoke-WebRequest -Uri $portableUrl -OutFile $zipPath -UseBasicParsing
     Expand-Archive -Path $zipPath -DestinationPath $pyDir -Force
     $pythonExe = "$pyDir\python.exe"
 
     # 2. Enable site-packages in embedded Python ._pth file
     Get-ChildItem -Path $pyDir -Filter "*._pth" | ForEach-Object {
-        $content = Get-Content $_.FullName
-        $content = $content -replace '#import site', 'import site'
-        Set-Content $_.FullName $content
+        $pthLines = @(
+            "python310.zip",
+            ".",
+            "Lib",
+            "Lib\site-packages",
+            "import site"
+        )
+        Set-Content $_.FullName ($pthLines -join "`r`n")
     }
 
-    # 3. Bootstrap pip in embedded Python
+    # 3. Create Lib and site-packages directories
+    New-Item -ItemType Directory -Path "$pyDir\Lib\site-packages" -Force | Out-Null
+
+    # 4. Bootstrap pip in embedded Python
     if (-not (Test-Path "$pyDir\Scripts\pip.exe")) {
-        Write-Host "[*] Bootstrapping pip for portable Python environment..." -ForegroundColor DarkGray
+        Write-Host "[*] Bootstrapping pip package manager for portable runtime..." -ForegroundColor DarkGray
         $getPipUrl = "https://bootstrap.pypa.io/get-pip.py"
         $getPipPath = "$pyDir\get-pip.py"
         Invoke-WebRequest -Uri $getPipUrl -OutFile $getPipPath -UseBasicParsing
         & $pythonExe $getPipPath --no-warn-script-location --quiet
     }
 
-    Write-Host "[✓] Portable Python initialized: $pythonExe" -ForegroundColor Green
+    Write-Host "[✓] Portable Python successfully configured: $pythonExe" -ForegroundColor Green
 }
 
 # 3. Download Latest Agent Source from GitHub Repository

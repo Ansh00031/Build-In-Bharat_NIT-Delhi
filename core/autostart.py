@@ -398,14 +398,17 @@ echo [*] Switching to Native Windows OS Emergency Engine...
 echo.
 
 set "CMD_ARG=%~1"
-if /i "%CMD_ARG%"=="checkup" goto :native_checkup
-if /i "%CMD_ARG%"=="junk" goto :native_junk
-if /i "%CMD_ARG%"=="dups" goto :native_dups
-if /i "%CMD_ARG%"=="adware" goto :native_adware
-if /i "%CMD_ARG%"=="rollback" goto :native_rollback
-if /i "%CMD_ARG:~0,2%"=="0x" goto :native_error
-if /i "%CMD_ARG%"=="bootstrap" goto :native_bootstrap
-if /i "%CMD_ARG%"=="install" goto :native_bootstrap
+if not defined CMD_ARG goto :native_menu
+if /i "!CMD_ARG!"=="checkup" goto :native_checkup
+if /i "!CMD_ARG!"=="junk" goto :native_junk
+if /i "!CMD_ARG!"=="dups" goto :native_dups
+if /i "!CMD_ARG!"=="adware" goto :native_adware
+if /i "!CMD_ARG!"=="rollback" goto :native_rollback
+if /i "!CMD_ARG:~0,2!"=="0x" goto :native_error
+if /i "!CMD_ARG:~0,2!"=="0X" goto :native_error
+if /i "!CMD_ARG!"=="bootstrap" goto :native_bootstrap
+if /i "!CMD_ARG!"=="install" goto :native_bootstrap
+goto :native_menu
 
 REM If no command argument, display Native Emergency Menu
 :native_menu
