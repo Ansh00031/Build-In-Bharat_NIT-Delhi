@@ -16,22 +16,22 @@ set "PATH=%PATH%;C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0"
 REM 1. Find and verify real Python executable (skips broken 0-byte WindowsApps alias)
 set "PY_EXE="
 
-REM 1.1 Test py launcher
-py -3 -c "import sys" >nul 2>&1
+REM 1.1 Test standard Python in PATH (must successfully execute import sys)
+python -c "import sys" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
-    set "PY_EXE=py -3"
+    set "PY_EXE=python"
     goto :find_agent
 )
+
+REM 1.2 Test py launcher
 py -c "import sys" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
     set "PY_EXE=py"
     goto :find_agent
 )
-
-REM 1.2 Test standard Python in PATH (must successfully execute import sys)
-python -c "import sys" >nul 2>&1
+py -3 -c "import sys" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
-    set "PY_EXE=python"
+    set "PY_EXE=py"
     goto :find_agent
 )
 
@@ -161,19 +161,48 @@ if exist "C:\os-debug-agent\agent.py" (
 REM 3. If agent.py and Python are found and verified, execute directly
 if defined AGENT_PY (
     if defined PY_EXE (
+        if "!PY_EXE!"=="py -3" set "PY_EXE=py"
         echo [INFO] Python Runtime : !PY_EXE!
         echo [INFO] Agent Engine   : !AGENT_PY!
         echo.
-        if "%~1"=="" (
-            "!PY_EXE!" "!AGENT_PY!" menu
-        ) else (
-            set "ARG1=%~1"
-            if "!ARG1:~0,2!"=="0x" (
-                "!PY_EXE!" "!AGENT_PY!" diagnose %*
-            ) else if "!ARG1:~0,2!"=="0X" (
-                "!PY_EXE!" "!AGENT_PY!" diagnose %*
+        if "!PY_EXE!"=="py" (
+            if "%~1"=="" (
+                py "!AGENT_PY!" menu
             ) else (
-                "!PY_EXE!" "!AGENT_PY!" %*
+                set "ARG1=%~1"
+                if "!ARG1:~0,2!"=="0x" (
+                    py "!AGENT_PY!" diagnose %*
+                ) else if "!ARG1:~0,2!"=="0X" (
+                    py "!AGENT_PY!" diagnose %*
+                ) else (
+                    py "!AGENT_PY!" %*
+                )
+            )
+        ) else if "!PY_EXE!"=="python" (
+            if "%~1"=="" (
+                python "!AGENT_PY!" menu
+            ) else (
+                set "ARG1=%~1"
+                if "!ARG1:~0,2!"=="0x" (
+                    python "!AGENT_PY!" diagnose %*
+                ) else if "!ARG1:~0,2!"=="0X" (
+                    python "!AGENT_PY!" diagnose %*
+                ) else (
+                    python "!AGENT_PY!" %*
+                )
+            )
+        ) else (
+            if "%~1"=="" (
+                "!PY_EXE!" "!AGENT_PY!" menu
+            ) else (
+                set "ARG1=%~1"
+                if "!ARG1:~0,2!"=="0x" (
+                    "!PY_EXE!" "!AGENT_PY!" diagnose %*
+                ) else if "!ARG1:~0,2!"=="0X" (
+                    "!PY_EXE!" "!AGENT_PY!" diagnose %*
+                ) else (
+                    "!PY_EXE!" "!AGENT_PY!" %*
+                )
             )
         )
         goto :end
