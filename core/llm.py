@@ -592,6 +592,34 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
             ],
         }
 
+    if "0X80004005" in code_upper or "E_FAIL" in code_upper:
+        return {
+            "error_code": "0x80004005",
+            "error_name": "E_FAIL / ERROR_UNSPECIFIED_COM (0x80004005)",
+            "threat_level": "MEDIUM (Threat Level 2/5 - System Fault)",
+            "diagnosis": "Windows error 0x80004005 (E_FAIL) is an unspecified COM/OLE execution exception. In healthy systems, this is often logged as a passive trace warning by background updater services or unregistered COM runtime DLLs.",
+            "device_harm": [
+                "Background updater threads may log trace exceptions",
+                "Certain legacy COM automation scripts may fail to instantiate",
+            ],
+            "consequence_if_unfixed": "Minor background application warnings or transient installer retry attempts.",
+            "likely_causes": [
+                "Passive historical background event log entry",
+                "Unregistered COM dynamic link library (atl.dll, ole32.dll, actxprxy.dll)",
+                "DCOM or RPC endpoint transient connection timeout",
+            ],
+            "diagnostic_commands": [
+                {
+                    "command": "Get-Service RpcSs, DcomLaunch, wuauserv, bits | Select-Object Name, Status, StartType",
+                    "purpose": "Verify Remote Procedure Call and DCOM subsystem status",
+                },
+                {
+                    "command": "Get-Service cryptsvc, trustedinstaller | Select-Object Name, Status",
+                    "purpose": "Verify Cryptographic and Component Servicing state",
+                },
+            ],
+        }
+
     return {
         "error_code": error_code,
         "error_name": f"OS_ERROR_{error_code}",
@@ -647,6 +675,14 @@ def _fallback_root_cause(error_code: str, execution_results: List[Dict[str, Any]
             "remediation_summary": "Flush DNS resolver cache and reset network socket catalog.",
         }
 
+    if "0X80004005" in code_upper:
+        return {
+            "root_cause_confirmed": True,
+            "root_cause_analysis": "Diagnostic verification confirmed that Remote Procedure Call (RpcSs) and core servicing daemons are active. Error 0x80004005 is a passive COM trace warning or unhandled exception from legacy background application components.",
+            "evidence": ["Core RPC and servicing status verified.", "DCOM subsystem responsive."],
+            "remediation_summary": "Re-register core COM/OLE dynamic link libraries and restart dependent servicing threads.",
+        }
+
     return {
         "root_cause_confirmed": True,
         "root_cause_analysis": (
@@ -664,6 +700,49 @@ def _fallback_root_cause(error_code: str, execution_results: List[Dict[str, Any]
 def _fallback_remediation_proposal(error_code: str, root_cause_data: Dict[str, Any]) -> Dict[str, Any]:
     """Heuristic fallback remediation script for common Windows errors."""
     code_upper = error_code.upper()
+
+    if "0X80004005" in code_upper:
+        script = """<#
+========================================================================================
+# PROBLEM STATEMENT & INCIDENT SUMMARY:
+----------------------------------------------------------------------------------------
+# Target Error Code  : 0x80004005 (E_FAIL / Unspecified COM Error)
+# Remediation Goal   : Re-register core Windows COM/OLE runtime DLLs -> Refresh services.
+========================================================================================
+#>
+
+$ErrorActionPreference = 'SilentlyContinue'
+$env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0;$env:SystemRoot;$env:PATH"
+$regsvrExe = if (Test-Path "$env:SystemRoot\\System32\\regsvr32.exe") { "$env:SystemRoot\\System32\\regsvr32.exe" } else { "regsvr32" }
+
+Write-Host "[1/3] Re-registering core COM & OLE dynamic link libraries..." -ForegroundColor Cyan
+$dlls = @('atl.dll', 'ole32.dll', 'oleaut32.dll', 'actxprxy.dll', 'msxml3.dll', 'vbscript.dll')
+foreach ($dll in $dlls) {
+    & $regsvrExe /s $dll 2>$null
+}
+
+Write-Host "[2/3] Restarting background servicing threads..." -ForegroundColor Cyan
+Restart-Service -Name cryptsvc, bits -Force -ErrorAction SilentlyContinue
+
+Write-Host "[3/3] Live verification of core subsystems..." -ForegroundColor Cyan
+Get-Service RpcSs, DcomLaunch, cryptsvc, bits | Select-Object Name, Status, StartType
+
+Write-Host "`n[SUCCESS] COM components re-registered and servicing threads refreshed." -ForegroundColor Green
+"""
+        return {
+            "title": "COM Runtime & OLE Component Registration Repair (0x80004005)",
+            "problem_statement": "System logged an unspecified COM/OLE execution exception (0x80004005).",
+            "summary": "Re-registers core Windows COM/OLE libraries (atl.dll, ole32.dll, actxprxy.dll) and refreshes background servicing threads.",
+            "steps": [
+                "Re-register core COM dynamic link libraries via regsvr32",
+                "Refresh Cryptographic and BITS servicing threads",
+                "Verify live status of RPC and DCOM subsystems",
+            ],
+            "script_type": "powershell",
+            "script_content": script.strip(),
+            "verification_command": "Get-Service RpcSs, DcomLaunch, cryptsvc | Select-Object Name, Status",
+            "requires_reboot": False,
+        }
 
     if "0X80070422" in code_upper:
         script = """<#

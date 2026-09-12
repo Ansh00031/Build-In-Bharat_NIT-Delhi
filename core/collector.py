@@ -48,18 +48,21 @@ def query_windows_event_logs(
     error_msg: Optional[str] = None
 
     # PowerShell script to safely query events and format as JSON
-    # Level 1 = Critical, Level 2 = Error
+    # Level 1 = Critical, Level 2 = Error. For full auto-scans, filter to recent 4 hours to avoid stale historical logs.
     ps_script = f"""
     $ErrorActionPreference = 'SilentlyContinue'
     $results = @()
     $channels = @('System', 'Application', 'Microsoft-Windows-WindowsUpdateClient/Operational')
+    $filter = @{{
+        LogName = 'System'
+        Level = 1, 2
+    }}
+    {"$filter['StartTime'] = (Get-Date).AddHours(-4)" if not error_code else ""}
 
     foreach ($chan in $channels) {{
         try {{
-            $logEvents = Get-WinEvent -FilterHashtable @{{
-                LogName = $chan
-                Level = 1, 2
-            }} -MaxEvents {max_events} 2>$null
+            $filter['LogName'] = $chan
+            $logEvents = Get-WinEvent -FilterHashtable $filter -MaxEvents {max_events} 2>$null
 
             if ($logEvents) {{
                 foreach ($evt in $logEvents) {{
@@ -226,10 +229,10 @@ def detect_system_errors(context: Dict[str, Any]) -> List[str]:
         except Exception:
             pass
 
-    # 2. Strict known Windows HRESULT / NTSTATUS error patterns from recent event logs
+    # Strict known Windows HRESULT / NTSTATUS error patterns from recent event logs
     events = context.get("event_logs", [])
     error_pattern = re.compile(
-        r"\b0x(8007[0-9a-fA-F]{4}|8024[0-9a-fA-F]{4}|800F[0-9a-fA-F]{4}|C0000[0-9a-fA-F]{3}|80004[0-9a-fA-F]{3}|80072[0-9a-fA-F]{3})\b",
+        r"\b0x(8007[0-9a-fA-F]{4}|8024[0-9a-fA-F]{4}|800F[0-9a-fA-F]{4}|C0000[0-9a-fA-F]{3}|80072[0-9a-fA-F]{3})\b",
         re.IGNORECASE,
     )
 
