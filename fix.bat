@@ -251,8 +251,6 @@ echo.
 set "CMD_ARG=%~1"
 if not defined CMD_ARG goto :native_menu
 if /i "!CMD_ARG!"=="checkup" goto :native_checkup
-if /i "!CMD_ARG!"=="junk" goto :native_junk
-if /i "!CMD_ARG!"=="dups" goto :native_dups
 if /i "!CMD_ARG!"=="adware" goto :native_adware
 if /i "!CMD_ARG!"=="rollback" goto :native_rollback
 if /i "!CMD_ARG:~0,2!"=="0x" goto :native_error
@@ -266,54 +264,35 @@ REM If no command argument, display Native Emergency Menu
 echo ===============================================================================
 echo                NATIVE WINDOWS EMERGENCY DIAGNOSTIC & REPAIR
 echo ===============================================================================
-echo  [1] Full System Health & Security Checkup (SFC / DISM / DNS / Junk)
-echo  [2] Scan & Clean Temporary Files and Caches
-echo  [3] Scan Duplicate Files in User Profile
-echo  [4] Remove Rogue Notifications and Adware Startups
-echo  [5] Diagnose Specific Windows Error Code
-echo  [6] Download & Setup Full AI Python Engine (Online)
-echo  [7] Exit
+echo  [1] Full System Health & Security Checkup (SFC / DISM / DNS / Services)
+echo  [2] Remove Rogue Notifications and Adware Startups
+echo  [3] Diagnose Specific Windows Error Code
+echo  [4] Download & Setup Full AI Python Engine (Online)
+echo  [5] Exit
 echo ===============================================================================
-set /p NCHOICE="Select an option [1-7]: "
+set /p NCHOICE="Select an option [1-5]: "
 
 if "%NCHOICE%"=="1" goto :native_checkup
-if "%NCHOICE%"=="2" goto :native_junk
-if "%NCHOICE%"=="3" goto :native_dups
-if "%NCHOICE%"=="4" goto :native_adware
-if "%NCHOICE%"=="5" (
+if "%NCHOICE%"=="2" goto :native_adware
+if "%NCHOICE%"=="3" (
     set /p ERR_INPUT="Enter error code (e.g., 0x80070005): "
     call :native_error !ERR_INPUT!
     goto :end
 )
-if "%NCHOICE%"=="6" goto :native_bootstrap
-if "%NCHOICE%"=="7" goto :end
+if "%NCHOICE%"=="4" goto :native_bootstrap
+if "%NCHOICE%"=="5" goto :end
 goto :native_menu
 
 :native_checkup
-echo [*] [Phase 1/4] Scanning and Cleaning System Temporary Junk...
-del /q /f /s "%TEMP%\*" >nul 2>&1
-del /q /f /s "C:\Windows\Temp\*" >nul 2>&1
-echo [✓] Temporary storage cleaned.
-echo.
-echo [*] [Phase 2/4] Testing Network & Resetting DNS Cache...
+echo [*] [Phase 1/3] Testing Network & Resetting DNS Cache...
 ipconfig /flushdns
 echo.
-echo [*] [Phase 3/4] Verifying Core Windows System Integrity (SFC / DISM)...
+echo [*] [Phase 2/3] Verifying Core Windows System Integrity (SFC / DISM)...
 powershell -Command "Write-Host '[*] Checking Windows Servicing Store Health...' -ForegroundColor Cyan; dism /Online /Cleanup-Image /CheckHealth"
 echo.
-echo [*] [Phase 4/4] Scanning System Crash Events & Blue Screens...
+echo [*] [Phase 3/3] Scanning System Crash Events & Blue Screens...
 powershell -Command "Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2} -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object TimeCreated, Id, Message | Format-Table -AutoSize"
 echo [✓] Full Native System Diagnostic completed successfully!
-goto :end
-
-:native_junk
-echo [*] Scanning and cleaning temporary files, log dumps, and caches...
-powershell -Command "$tempPaths = @($env:TEMP, 'C:\Windows\Temp', 'C:\Windows\Prefetch', (Join-Path $env:LOCALAPPDATA 'CrashDumps'), 'C:\Windows\SoftwareDistribution\Download', (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\WER')); $delBytes = 0; $delCount = 0; foreach ($p in $tempPaths) { if (Test-Path $p) { Get-ChildItem -Path $p -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { try { $sz = $_.Length; Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop; $delBytes += $sz; $delCount++ } catch {} } } }; Write-Host ('[✓] Cleaned ' + $delCount + ' junk file(s) — Reclaimed ' + [math]::Round($delBytes/1MB, 2) + ' MB of disk space!') -ForegroundColor Green"
-goto :end
-
-:native_dups
-echo [*] Scanning for duplicate files across all system drives & user folders...
-powershell -Command "$scanFolders = @($env:USERPROFILE); foreach ($d in 'D','E','F') { if (Test-Path ($d + ':\')) { $scanFolders += ($d + ':\') } }; $files = Get-ChildItem -Path $scanFolders -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1024 -and $_.FullName -notmatch '\\(Windows|Program Files|AppData|\.git|\.venv|node_modules)\\' } | Group-Object -Property Length | Where-Object { $_.Count -gt 1 }; Write-Host ('Found ' + $files.Count + ' potential duplicate size groups across PC.'); foreach ($g in ($files | Select-Object -First 15)) { Write-Host ('  Group Size: ' + [math]::Round($g.Values[0]/1KB,1) + ' KB'); foreach ($item in $g.Group) { Write-Host ('    - ' + $item.FullName) } }"
 goto :end
 
 :native_adware

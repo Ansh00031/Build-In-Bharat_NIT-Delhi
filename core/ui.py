@@ -715,60 +715,6 @@ def print_resolved_issues_table(issues: List[Dict[str, Any]], archive_path: Opti
         console.print()
 
 
-def print_junk_and_duplicates_summary(junk_data: Dict[str, Any], dup_data: Dict[str, Any]) -> None:
-    """Print comprehensive summary table of junk files and duplicate copies."""
-    # 1. Junk Files Table
-    junk_table = Table(
-        title="[bold yellow]🧹 System Junk & Temporary Cache Audit[/bold yellow]",
-        border_style="yellow",
-        header_style="bold yellow",
-    )
-    junk_table.add_column("Category", style="bold white", width=30)
-    junk_table.add_column("Location", style="dim cyan")
-    junk_table.add_column("Files", style="cyan", justify="right", width=8)
-    junk_table.add_column("Size", style="bold green", justify="right", width=12)
-
-    categories = junk_data.get("categories", [])
-    if not categories:
-        junk_table.add_row("Clean", "No significant junk files detected", "0", "0 B")
-    else:
-        for cat in categories:
-            junk_table.add_row(
-                cat["category"],
-                cat["folder"],
-                str(cat["file_count"]),
-                cat["total_formatted"],
-            )
-
-    console.print(junk_table)
-    console.print(f"[bold white]Total Junk Found:[/bold white] [bold yellow]{junk_data.get('total_files', 0)} files[/bold yellow] ([bold green]{junk_data.get('total_formatted', '0 B')}[/bold green] reclaimable)\n")
-
-    # 2. Duplicate Files Table
-    dup_table = Table(
-        title="[bold cyan]📑 Duplicate Files Audit (System Drives & User Folders)[/bold cyan]",
-        border_style="cyan",
-        header_style="bold cyan",
-    )
-    dup_table.add_column("#", style="dim", width=4)
-    dup_table.add_column("Duplicate Copies Detected", style="white")
-    dup_table.add_column("File Size", style="yellow", justify="right", width=12)
-    dup_table.add_column("Wasted Space", style="bold red", justify="right", width=14)
-
-    groups = dup_data.get("groups", [])
-    if not groups:
-        dup_table.add_row("-", "No duplicate files detected across scanned drives and folders.", "-", "0 B")
-    else:
-        for idx, grp in enumerate(groups[:15], 1):  # Show top 15 groups
-            orig_path = grp["original"]["path"]
-            copies_text = f"[bold green]Original:[/bold green] {orig_path}\n"
-            for c in grp["copies"]:
-                copies_text += f"[bold red]Copy:[/bold red] {c['path']}\n"
-            dup_table.add_row(str(idx), copies_text.strip(), grp["file_size_formatted"], grp["wasted_formatted"])
-
-    console.print(dup_table)
-    console.print(f"[bold white]Total Redundant Copies:[/bold white] [bold red]{dup_data.get('total_duplicate_copies', 0)} copies[/bold red] across {dup_data.get('total_groups', 0)} file groups ([bold green]{dup_data.get('total_wasted_formatted', '0 B')}[/bold green] reclaimable)\n")
-
-
 def print_web_threats_summary(threat_data: Dict[str, Any]) -> None:
     """Print comprehensive summary of malicious web notification permissions and adware hooks."""
     all_threats = threat_data.get("all_threats", [])
@@ -805,13 +751,12 @@ def print_web_threats_summary(threat_data: Dict[str, Any]) -> None:
 def print_full_checkup_header() -> None:
     """Print banner for Full PC Security & System Checkup."""
     content = (
-        "[bold white]⚡ FULL PC SECURITY, HEALTH & STORAGE DOCTOR ⚡[/bold white]\n\n"
+        "[bold white]⚡ FULL PC SECURITY & SYSTEM HEALTH SCANNER ⚡[/bold white]\n\n"
         "[cyan]1. System File & Binary Integrity Check[/cyan] (SFC / DISM / Kernel verification)\n"
         "[cyan]2. Event Viewer Crash Log Audit[/cyan] (System, Application, WindowsUpdate, Security)\n"
         "[cyan]3. Core Security & System Services Health[/cyan] (wuauserv, bits, cryptsvc, WinDefend)\n"
         "[cyan]4. Malicious Web Push & Adware Popup Audit[/cyan] (Chrome, Edge, Brave, Firefox notification spammers)\n"
-        "[cyan]5. Storage & Duplicate File Manager[/cyan] (Scans junk caches & duplicate copies with user permission)\n"
-        "[cyan]6. Autonomous AI Auto-Heal Engine[/cyan] (Detects root cause & generates verified fix)"
+        "[cyan]5. Autonomous AI Auto-Heal Engine[/cyan] (Detects root cause & generates verified fix)"
     )
     console.print(
         Panel(
@@ -837,23 +782,21 @@ def print_interactive_menu() -> None:
     menu_table.add_column("Description", style="dim white")
 
     options = [
-        ("1", "full-checkup", "🛡️ Security & Health", "Full PC scan — auto-heals errors, cleans adware & scans storage"),
+        ("1", "full-checkup", "🛡️ Security & Health", "Full PC scan — auto-heals errors and cleans adware threats"),
         ("2", "diagnose", "🔵 Targeted Diagnostic", "Diagnose a specific OS error code (e.g. 0x80070005, 0x80240020)"),
-        ("3", "clean-junk", "🧹 Storage Cleaner", "Scan and delete OS temp caches, crash dumps, and prefetch clutter"),
-        ("4", "scan-duplicates", "📑 Duplicate Finder", "Find duplicate files in user folders with permission-gated deletion"),
-        ("5", "scan-web-threats", "🛡️ Web & Adware", "Scan and remove rogue browser push notifications & adware popups"),
-        ("6", "rollback", "🛡️ Recovery Engine", "1-Click instant system rollback to pre-fix baseline snapshot"),
-        ("7", "solved-issues", "🟢 Archive & Audit", "Display all solved & resolved problems saved in separate archive file"),
-        ("8", "startup-monitor", "📊 Live Health Monitor", "Real-time active vs resolved issues and live OS services check"),
-        ("9", "resume", "🔄 Post-Reboot Wakeup", "Resume and verify diagnostic session after computer restart"),
-        ("10", "history", "📜 Session History", "View complete historical table of all diagnostic/fix sessions"),
-        ("11", "blockchain status", "🟣 Web3 / Algorand", "View Algorand TestNet wallet, balance, and AlgoKit Lora link"),
-        ("12", "blockchain anchor", "🟣 Web3 / Algorand", "Commit cryptographic SHA-256 proof of repair to blockchain"),
-        ("13", "check-env", "⚙️ System Config", "Verify environment, LLM configuration, and Administrator/root rights"),
-        ("14", "enable-autostart", "🚀 Startup Setup", "Register agent to automatically monitor system health on boot"),
-        ("15", "disable-autostart", "🚀 Startup Setup", "Remove automatic boot monitor from startup tasks"),
-        ("16", "startup-log", "📜 Boot History Log", "View timestamped log of all automatic startup health runs"),
-        ("17", "install-shortcut", "⚡ 1-Word 'fix' Cmd", "Install permanent 1-word 'fix' shortcut in Command Prompt (cmd)"),
+        ("3", "scan-web-threats", "🛡️ Web & Adware", "Scan and remove rogue browser push notifications & adware popups"),
+        ("4", "rollback", "🛡️ Recovery Engine", "1-Click instant system rollback to pre-fix baseline snapshot"),
+        ("5", "solved-issues", "🟢 Archive & Audit", "Display all solved & resolved problems saved in separate archive file"),
+        ("6", "startup-monitor", "📊 Live Health Monitor", "Real-time active vs resolved issues and live OS services check"),
+        ("7", "resume", "🔄 Post-Reboot Wakeup", "Resume and verify diagnostic session after computer restart"),
+        ("8", "history", "📜 Session History", "View complete historical table of all diagnostic/fix sessions"),
+        ("9", "blockchain status", "🟣 Web3 / Algorand", "View Algorand TestNet wallet, balance, and AlgoKit Lora link"),
+        ("10", "blockchain anchor", "🟣 Web3 / Algorand", "Commit cryptographic SHA-256 proof of repair to blockchain"),
+        ("11", "check-env", "⚙️ System Config", "Verify environment, LLM configuration, and Administrator/root rights"),
+        ("12", "enable-autostart", "🚀 Startup Setup", "Register agent to automatically monitor system health on boot"),
+        ("13", "disable-autostart", "🚀 Startup Setup", "Remove automatic boot monitor from startup tasks"),
+        ("14", "startup-log", "📜 Boot History Log", "View timestamped log of all automatic startup health runs"),
+        ("15", "install-shortcut", "⚡ 1-Word 'fix' Cmd", "Install permanent 1-word 'fix' shortcut in Command Prompt (cmd)"),
         ("0", "exit", "❌ Exit", "Exit interactive command menu"),
     ]
 
@@ -862,5 +805,6 @@ def print_interactive_menu() -> None:
 
     console.print(menu_table)
     console.print()
+
 
 

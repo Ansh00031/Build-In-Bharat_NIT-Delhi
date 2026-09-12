@@ -233,43 +233,33 @@ python agent.py menu
 fix
 ```
 
-> **Interactive Menu:** Displays numbered options `[1]` to `[17]` with clear descriptions. Simply type the number `1` to `17` (or command name) to execute any tool directly:
-> 
-> - `[1]` **full-checkup**: Complete 4-phase laptop security, health, adware & storage scan.
-> - `[2]` **diagnose**: Diagnose specific OS error code (e.g. `0x80070005`).
-> - `[3]` **clean-junk**: Scan and delete temporary OS clutter, crash dumps, and prefetch caches.
-> - `[4]` **scan-duplicates**: SHA-256 duplicate file detection with permission-gated removal.
-> - `[5]` **scan-web-threats**: Audit and clean rogue browser push notifications & adware hooks.
-> - `[6]` **rollback**: 1-Click instant system rollback to pre-fix snapshot.
-> - `[7]` **solved-issues**: View archived list of resolved problems.
-> - `[8]` **startup-monitor**: Live active vs resolved health monitor.
-> - `[9]` **resume**: Resume post-reboot verification.
-> - `[10]` **history**: Complete diagnostic and fix session history.
-> - `[11]` **blockchain status**: Algorand TestNet wallet & AlgoKit Lora profile.
-> - `[12]` **blockchain anchor**: Commit cryptographic SHA-256 proof to Algorand TestNet.
-> - `[13]` **check-env**: Verify environment, LLM keys, and admin rights.
-> - `[14]` **enable-autostart**: Enable automatic startup health monitor on boot.
-> - `[15]` **disable-autostart**: Disable automatic boot monitor.
-> - `[16]` **startup-log**: View historical log of startup health runs.
-> - `[17]` **install-shortcut**: Install permanent 1-word `fix` command across user & system PATH.
-
----
-
-### 7. Storage & Duplicate File Manager
-
-Scan and reclaim disk space safely with explicit user confirmation:
-
-```powershell
-# Scan and clean temporary junk files and OS caches:
-python agent.py clean-junk
-
-# Scan user folders (Downloads, Documents, Desktop) for SHA-256 duplicate copies:
-python agent.py scan-duplicates
+```bash
+python agent.py menu
+# OR simply:
+fix
 ```
 
+> **Interactive Menu:** Displays numbered options `[1]` to `[15]` with clear descriptions. Simply type the number `1` to `15` (or command name) to execute any tool directly:
+> 
+> - `[1]` **full-checkup**: Complete 3-phase laptop security, health, and adware scan.
+> - `[2]` **diagnose**: Diagnose specific OS error code (e.g. `0x80070005`).
+> - `[3]` **scan-web-threats**: Audit and clean rogue browser push notifications & adware hooks.
+> - `[4]` **rollback**: 1-Click instant system rollback to pre-fix snapshot.
+> - `[5]` **solved-issues**: View archived list of resolved problems.
+> - `[6]` **startup-monitor**: Live active vs resolved health monitor.
+> - `[7]` **resume**: Resume post-reboot verification.
+> - `[8]` **history**: Complete diagnostic and fix session history.
+> - `[9]` **blockchain status**: Algorand TestNet wallet & AlgoKit Lora profile.
+> - `[10]` **blockchain anchor**: Commit cryptographic SHA-256 proof to Algorand TestNet.
+> - `[11]` **check-env**: Verify environment, LLM keys, and admin rights.
+> - `[12]` **enable-autostart**: Enable automatic startup health monitor on boot.
+> - `[13]` **disable-autostart**: Disable automatic boot monitor.
+> - `[14]` **startup-log**: View historical log of startup health runs.
+> - `[15]` **install-shortcut**: Install permanent 1-word `fix` command across user & system PATH.
+
 ---
 
-### 8. Malicious Web Notifications & Adware Popup Cleaner
+### 7. Malicious Web Notifications & Adware Popup Cleaner
 
 Audit browser profiles (Chrome, Edge, Brave, Firefox) for rogue notification permissions and adware startup hooks:
 
@@ -279,7 +269,7 @@ python agent.py scan-web-threats
 
 ---
 
-### 9. View Archived Solved & Resolved Problems
+### 8. View Archived Solved & Resolved Problems
 
 View all permanently repaired system issues archived in the separate database file:
 
@@ -291,7 +281,7 @@ python agent.py solved-issues
 
 ---
 
-### 10. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
+### 9. Algorand TestNet & AlgoKit Lora Explorer On-Chain Audit Proofs
 
 View your Algorand TestNet wallet, balance, and explorer profile:
 
@@ -316,7 +306,7 @@ python agent.py diagnose 0x80070005 --skip-admin-check --anchor
 
 ---
 
-### 11. Check Environment & Security Status
+### 10. Check Environment & Security Status
 
 ```powershell
 python agent.py check-env
@@ -344,7 +334,6 @@ os-debug-agent/
     ├── executor.py        # Secure read-only command runner with safety filters
     ├── remediation.py     # Subprocess script runner with auto-cleanup
     ├── snapshot.py        # Pre-fix snapshot and rollback engine
-    ├── storage_cleaner.py # Junk cache cleaner & SHA-256 duplicate file detector
     ├── web_threat_cleaner.py # Browser push notification & adware popup remover
     ├── autostart.py       # Windows startup task manager & 'fix' installer
     ├── blockchain.py      # Algorand TestNet & AlgoKit Lora anchor engine
