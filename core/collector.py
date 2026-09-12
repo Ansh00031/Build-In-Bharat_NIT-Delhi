@@ -229,10 +229,10 @@ def detect_system_errors(context: Dict[str, Any]) -> List[str]:
         except Exception:
             pass
 
-    # Strict known Windows HRESULT / NTSTATUS error patterns from recent event logs
+    # Strict known Windows HRESULT error patterns from recent event logs (excludes benign NTSTATUS exit traces)
     events = context.get("event_logs", [])
     error_pattern = re.compile(
-        r"\b0x(8007[0-9a-fA-F]{4}|8024[0-9a-fA-F]{4}|800F[0-9a-fA-F]{4}|C0000[0-9a-fA-F]{3}|80072[0-9a-fA-F]{3})\b",
+        r"\b0x(8007[0-9a-fA-F]{4}|8024[0-9a-fA-F]{4}|800F[0-9a-fA-F]{4}|80072[0-9a-fA-F]{3})\b",
         re.IGNORECASE,
     )
 

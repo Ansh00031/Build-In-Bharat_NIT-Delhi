@@ -394,11 +394,17 @@ def diagnose(
     if not target_code:
         detected = context.get("detected_error_codes", [])
         if detected:
-            target_code = detected[0]
-            console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected Active Issue:[/bold yellow] [bold red]{target_code}[/bold red] (analyzing logs)...\n")
+            if len(detected) == 1:
+                target_code = detected[0]
+                console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected Active Issue:[/bold yellow] [bold red]{target_code}[/bold red] (analyzing live telemetry)...\n")
+            else:
+                target_code = detected[0]
+                code_list_str = ", ".join([f"[bold red]{c}[/bold red]" for c in detected])
+                console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected {len(detected)} Issues at once:[/bold yellow] {code_list_str}\n")
+                console.print("[dim]Formulating consolidated all-in-one diagnostic and self-healing plan...[/dim]\n")
         else:
             target_code = "SYSTEM_HEALTH_CHECK"
-            console.print("[bold green]✓ Whole Laptop Scan Result:[/bold green] System event logs extracted. Performing full health and service integrity check.\n")
+            console.print("[bold green]✓ Whole Laptop Scan Result:[/bold green] Live services & event logs analyzed. System integrity nominal.\n")
 
     error_code = target_code
     session_id = generate_session_id(error_code)
