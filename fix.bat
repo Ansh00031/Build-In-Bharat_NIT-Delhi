@@ -308,12 +308,12 @@ goto :end
 
 :native_junk
 echo [*] Scanning and cleaning temporary files, log dumps, and caches...
-powershell -Command "$tempPaths = @($env:TEMP, 'C:\Windows\Temp', 'C:\Windows\Prefetch'); foreach ($p in $tempPaths) { if (Test-Path $p) { $files = Get-ChildItem -Path $p -Recurse -File -ErrorAction SilentlyContinue; $size = ($files | Measure-Object -Property Length -Sum).Sum / 1MB; Write-Host ('  [+] Found ' + [math]::Round($size, 2) + ' MB in ' + $p); Remove-Item -Path ($p + '\*') -Recurse -Force -ErrorAction SilentlyContinue } }; Write-Host '[✓] Junk cleanup complete!' -ForegroundColor Green"
+powershell -Command "$tempPaths = @($env:TEMP, 'C:\Windows\Temp', 'C:\Windows\Prefetch', (Join-Path $env:LOCALAPPDATA 'CrashDumps'), 'C:\Windows\SoftwareDistribution\Download', (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows\WER')); $delBytes = 0; $delCount = 0; foreach ($p in $tempPaths) { if (Test-Path $p) { Get-ChildItem -Path $p -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { try { $sz = $_.Length; Remove-Item -LiteralPath $_.FullName -Force -ErrorAction Stop; $delBytes += $sz; $delCount++ } catch {} } } }; Write-Host ('[✓] Cleaned ' + $delCount + ' junk file(s) — Reclaimed ' + [math]::Round($delBytes/1MB, 2) + ' MB of disk space!') -ForegroundColor Green"
 goto :end
 
 :native_dups
-echo [*] Scanning for duplicate files by size and hash in User Profile...
-powershell -Command "$files = Get-ChildItem -Path $env:USERPROFILE\Documents, $env:USERPROFILE\Downloads, $env:USERPROFILE\Desktop -File -Recurse -ErrorAction SilentlyContinue | Group-Object -Property Length | Where-Object { $_.Count -gt 1 }; Write-Host ('Found ' + $files.Count + ' potential duplicate size groups.'); foreach ($g in ($files | Select-Object -First 10)) { Write-Host ('  Group Size: ' + [math]::Round($g.Values[0]/1KB,1) + ' KB'); foreach ($item in $g.Group) { Write-Host ('    - ' + $item.FullName) } }"
+echo [*] Scanning for duplicate files across all system drives & user folders...
+powershell -Command "$scanFolders = @($env:USERPROFILE); foreach ($d in 'D','E','F') { if (Test-Path ($d + ':\')) { $scanFolders += ($d + ':\') } }; $files = Get-ChildItem -Path $scanFolders -File -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1024 -and $_.FullName -notmatch '\\(Windows|Program Files|AppData|\.git|\.venv|node_modules)\\' } | Group-Object -Property Length | Where-Object { $_.Count -gt 1 }; Write-Host ('Found ' + $files.Count + ' potential duplicate size groups across PC.'); foreach ($g in ($files | Select-Object -First 15)) { Write-Host ('  Group Size: ' + [math]::Round($g.Values[0]/1KB,1) + ' KB'); foreach ($item in $g.Group) { Write-Host ('    - ' + $item.FullName) } }"
 goto :end
 
 :native_adware

@@ -745,7 +745,7 @@ def print_junk_and_duplicates_summary(junk_data: Dict[str, Any], dup_data: Dict[
 
     # 2. Duplicate Files Table
     dup_table = Table(
-        title="[bold cyan]📑 Duplicate Files Audit (Downloads, Documents, Desktop)[/bold cyan]",
+        title="[bold cyan]📑 Duplicate Files Audit (System Drives & User Folders)[/bold cyan]",
         border_style="cyan",
         header_style="bold cyan",
     )
@@ -756,7 +756,7 @@ def print_junk_and_duplicates_summary(junk_data: Dict[str, Any], dup_data: Dict[
 
     groups = dup_data.get("groups", [])
     if not groups:
-        dup_table.add_row("-", "No duplicate files detected in user profile.", "-", "0 B")
+        dup_table.add_row("-", "No duplicate files detected across scanned drives and folders.", "-", "0 B")
     else:
         for idx, grp in enumerate(groups[:15], 1):  # Show top 15 groups
             orig_path = grp["original"]["path"]

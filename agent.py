@@ -995,7 +995,7 @@ def blockchain_anchor_cmd(
 def clean_junk_cmd() -> None:
     """Scan and delete OS temp files, crash dumps, and prefetch clutter upon user confirmation."""
     print_banner()
-    console.print("[bold cyan]🔍 Scanning system caches, temporary folders, and crash logs...[/bold cyan]\n")
+    console.print("[bold cyan]🔍 Dynamically scanning system caches, temporary folders, error reports, and crash logs...[/bold cyan]\n")
     junk_data = scan_junk_files()
     dup_empty = {"groups": [], "total_groups": 0, "total_duplicate_copies": 0, "total_wasted_formatted": "0 B"}
     print_junk_and_duplicates_summary(junk_data, dup_empty)
@@ -1016,18 +1016,22 @@ def clean_junk_cmd() -> None:
         default=True,
     )
     if should_delete:
-        del_count, rec_bytes, errors = delete_junk_files(junk_data, confirmed=True)
+        del_count, rec_bytes, locked_count, errors = delete_junk_files(junk_data, confirmed=True)
         record_command_history(
             command="clean-junk",
             category="🧹 Storage Cleaner",
-            action_summary=f"Cleaned {del_count} junk files, reclaimed {format_size(rec_bytes)} disk space",
+            action_summary=f"Cleaned {del_count} junk files, reclaimed {format_size(rec_bytes)} disk space ({locked_count} in-use files safely skipped)",
             status="CLEANED",
-            details={"deleted_count": del_count, "reclaimed_bytes": rec_bytes},
+            details={"deleted_count": del_count, "reclaimed_bytes": rec_bytes, "locked_in_use": locked_count},
         )
-        console.print(f"\n[bold green]✓ Successfully cleaned {del_count} junk file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+        console.print(f"\n[bold green]✓ Successfully cleaned {del_count} junk file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]")
+        if locked_count > 0:
+            console.print(f"[dim yellow]ℹ Note: {locked_count} log/temp file(s) currently held open by active Windows background services were safely preserved.[/dim yellow]\n")
+        else:
+            console.print()
         if errors:
             for e in errors[:5]:
-                console.print(f"  [dim yellow]• {e}[/dim yellow]")
+                console.print(f"  [dim red]• {e}[/dim red]")
     else:
         record_command_history(
             command="clean-junk",
@@ -1046,9 +1050,9 @@ def clean_storage_alias_cmd() -> None:
 
 @app.command(name="scan-duplicates")
 def scan_duplicates_cmd() -> None:
-    """Scan Downloads, Documents, and Desktop for duplicate files with permission-gated deletion."""
+    """Scan the entire PC across all drives and user directories for duplicate files with permission-gated deletion."""
     print_banner()
-    console.print("[bold cyan]🔍 Scanning user folders (Downloads, Documents, Desktop) for duplicate files (SHA-256 matching)...[/bold cyan]\n")
+    console.print("[bold cyan]🔍 Scanning entire PC across all system drives & user folders for duplicate files (SHA-256 matching)...[/bold cyan]\n")
     dup_data = scan_duplicate_files()
     junk_empty = {"categories": [], "total_files": 0, "total_formatted": "0 B"}
     print_junk_and_duplicates_summary(junk_empty, dup_data)
@@ -1058,10 +1062,10 @@ def scan_duplicates_cmd() -> None:
         record_command_history(
             command="scan-duplicates",
             category="📑 Duplicate Finder",
-            action_summary="Scanned user folders (Downloads, Documents, Desktop) — 0 duplicate files",
+            action_summary="Scanned system drives and user folders — 0 duplicate files",
             status="HEALTHY",
         )
-        console.print("[bold green]No duplicate files detected in user folders.[/bold green]\n")
+        console.print("[bold green]No duplicate files detected across scanned drives and folders.[/bold green]\n")
         return
 
     should_delete = Confirm.ask(
@@ -1069,18 +1073,22 @@ def scan_duplicates_cmd() -> None:
         default=True,
     )
     if should_delete:
-        del_count, rec_bytes, errors = delete_duplicate_copies(dup_data, confirmed=True)
+        del_count, rec_bytes, locked_count, errors = delete_duplicate_copies(dup_data, confirmed=True)
         record_command_history(
             command="scan-duplicates",
             category="📑 Duplicate Finder",
             action_summary=f"Deleted {del_count} redundant duplicate copies, reclaimed {format_size(rec_bytes)} disk space",
             status="CLEANED",
-            details={"deleted_copies": del_count, "reclaimed_bytes": rec_bytes},
+            details={"deleted_copies": del_count, "reclaimed_bytes": rec_bytes, "locked_files": locked_count},
         )
-        console.print(f"\n[bold green]✓ Successfully removed {del_count} duplicate copy file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+        console.print(f"\n[bold green]✓ Successfully removed {del_count} duplicate copy file(s) and reclaimed {format_size(rec_bytes)} of disk space![/bold green]")
+        if locked_count > 0:
+            console.print(f"[dim yellow]ℹ Note: {locked_count} file(s) currently open in applications were safely skipped.[/dim yellow]\n")
+        else:
+            console.print()
         if errors:
             for e in errors[:5]:
-                console.print(f"  [dim yellow]• {e}[/dim yellow]")
+                console.print(f"  [dim red]• {e}[/dim red]")
     else:
         record_command_history(
             command="scan-duplicates",
@@ -1194,7 +1202,7 @@ def full_checkup_cmd(
             cleaned_count, errors = clean_web_threats(threat_data, confirmed=True)
             console.print(f"[bold green]✓ Successfully cleaned {cleaned_count} web threat/adware item(s)![/bold green]\n")
 
-    console.print("\n[bold cyan]► Phase 4/4: Scanning disk for temporary junk files & redundant duplicate copies...[/bold cyan]")
+    console.print("\n[bold cyan]► Phase 4/4: Scanning entire disk for temporary junk files & redundant duplicate copies...[/bold cyan]")
     junk_data = scan_junk_files()
     dup_data = scan_duplicate_files()
     print_junk_and_duplicates_summary(junk_data, dup_data)
@@ -1205,14 +1213,22 @@ def full_checkup_cmd(
     if total_junk > 0:
         clean_junk_prompt = Confirm.ask(f"[bold yellow]Delete {total_junk} temporary junk files to reclaim {junk_data.get('total_formatted')}?[/bold yellow]", default=True)
         if clean_junk_prompt:
-            del_cnt, rec_bytes, _ = delete_junk_files(junk_data, confirmed=True)
-            console.print(f"[bold green]✓ Cleaned {del_cnt} junk file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+            del_cnt, rec_bytes, locked_cnt, _ = delete_junk_files(junk_data, confirmed=True)
+            console.print(f"[bold green]✓ Cleaned {del_cnt} junk file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]")
+            if locked_cnt > 0:
+                console.print(f"[dim yellow]ℹ Note: {locked_cnt} active OS service log file(s) safely preserved.[/dim yellow]\n")
+            else:
+                console.print()
 
     if total_dups > 0:
         clean_dup_prompt = Confirm.ask(f"[bold yellow]Delete {total_dups} redundant duplicate copies (preserving originals) to reclaim {dup_data.get('total_wasted_formatted')}?[/bold yellow]", default=True)
         if clean_dup_prompt:
-            del_cnt, rec_bytes, _ = delete_duplicate_copies(dup_data, confirmed=True)
-            console.print(f"[bold green]✓ Cleaned {del_cnt} duplicate file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]\n")
+            del_cnt, rec_bytes, locked_cnt, _ = delete_duplicate_copies(dup_data, confirmed=True)
+            console.print(f"[bold green]✓ Cleaned {del_cnt} duplicate file(s) — Reclaimed {format_size(rec_bytes)} of disk space![/bold green]")
+            if locked_cnt > 0:
+                console.print(f"[dim yellow]ℹ Note: {locked_cnt} open file(s) safely skipped.[/dim yellow]\n")
+            else:
+                console.print()
 
     record_command_history(
         command="full-checkup",
