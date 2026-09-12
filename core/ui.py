@@ -797,6 +797,7 @@ def print_interactive_menu() -> None:
         ("13", "disable-autostart", "🚀 Startup Setup", "Remove automatic boot monitor from startup tasks"),
         ("14", "startup-log", "📜 Boot History Log", "View timestamped log of all automatic startup health runs"),
         ("15", "install-shortcut", "⚡ 1-Word 'fix' Cmd", "Install permanent 1-word 'fix' shortcut in Command Prompt (cmd)"),
+        ("16", "clear-history", "🗑️ Reset & Cleanup", "Permanently delete resolved archive, history logs, and test snapshots"),
         ("0", "exit", "❌ Exit", "Exit interactive command menu"),
     ]
 

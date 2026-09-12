@@ -287,3 +287,39 @@ def load_command_history() -> List[Dict[str, Any]]:
         })
     return fallback_history
 
+
+def clear_resolved_issues() -> bool:
+    """Permanently delete and reset the resolved issues database and log."""
+    res_file = get_resolved_issues_file()
+    res_log = get_resolved_log_file()
+    try:
+        if res_file.exists():
+            res_file.unlink()
+        if res_log.exists():
+            res_log.unlink()
+        return True
+    except Exception:
+        return False
+
+
+def clear_all_history() -> bool:
+    """Permanently clear all command history, resolved issues, and old backup sessions."""
+    clear_resolved_issues()
+    hist_file = get_command_history_file()
+    hist_log = get_command_history_log_file()
+    try:
+        if hist_file.exists():
+            hist_file.unlink()
+        if hist_log.exists():
+            hist_log.unlink()
+        
+        # Clean session directories in .backups
+        b_dir = get_backups_dir()
+        for item in b_dir.iterdir():
+            if item.is_dir() and item.name.startswith("session_"):
+                shutil.rmtree(item, ignore_errors=True)
+        return True
+    except Exception:
+        return False
+
+

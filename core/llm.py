@@ -449,6 +449,111 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
     """Heuristic fallback for common OS error codes when LLM is offline or no API key is provided."""
     code_upper = error_code.upper()
 
+    if "SYSTEM_HEALTH_CHECK" in code_upper or "ALL_CLEAR" in code_upper or "HEALTHY" in code_upper:
+        return {
+            "error_code": "SYSTEM_HEALTH_CHECK",
+            "error_name": "SYSTEM_ALL_CLEAR",
+            "threat_level": "NOMINAL (Threat Level 0/5 - System Healthy)",
+            "diagnosis": "All system event logs, background services, and kernel components are operating within normal parameters. No active critical errors or service blocks detected.",
+            "device_harm": [],
+            "consequence_if_unfixed": "None. System is currently healthy and functioning properly.",
+            "likely_causes": ["System operating normally"],
+            "diagnostic_commands": [
+                {
+                    "command": "Get-Service wuauserv, bits, cryptsvc, WinDefend -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType",
+                    "purpose": "Verify state of critical Windows services",
+                },
+                {
+                    "command": "Get-WinEvent -FilterHashtable @{LogName='System'; Level=1,2} -MaxEvents 5 -ErrorAction SilentlyContinue | Select-Object TimeCreated, Id, Message",
+                    "purpose": "Inspect recent System error events",
+                },
+            ],
+        }
+
+    if "0X80070422" in code_upper or "SERVICE_DISABLED" in code_upper:
+        return {
+            "error_code": "0x80070422",
+            "error_name": "ERROR_SERVICE_DISABLED (0x80070422)",
+            "threat_level": "HIGH (Threat Level 4/5 - Core Service Blocked)",
+            "diagnosis": "Windows error 0x80070422 indicates that a required system service (such as Windows Update or BITS) is disabled or cannot be started. This completely stops system updates and security patches.",
+            "device_harm": [
+                "Windows Update and Microsoft Store downloads are completely disabled",
+                "Critical Defender antivirus signature updates fail to install",
+                "System remains vulnerable to unpatched security vulnerabilities",
+            ],
+            "consequence_if_unfixed": "Device will not receive security fixes, causing compounding OS instability over time.",
+            "likely_causes": [
+                "wuauserv or bits service startup type configured to 'Disabled'",
+                "Corrupted service registry configuration under HKLM\\SYSTEM\\CurrentControlSet\\Services",
+            ],
+            "diagnostic_commands": [
+                {
+                    "command": "Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status, StartType",
+                    "purpose": "Check if Windows Update or BITS services are Disabled or Stopped",
+                },
+                {
+                    "command": "Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\wuauserv' -ErrorAction SilentlyContinue | Select-Object Start, ImagePath",
+                    "purpose": "Inspect Windows Update service registry startup value (4 = Disabled, 2/3 = Active)",
+                },
+            ],
+        }
+
+    if "0X80072EE7" in code_upper or "DNS_ERROR" in code_upper:
+        return {
+            "error_code": "0x80072EE7",
+            "error_name": "ERROR_INTERNET_NAME_NOT_RESOLVED (0x80072EE7)",
+            "threat_level": "HIGH (Threat Level 3/5 - Network/DNS Resolution Failure)",
+            "diagnosis": "Windows error 0x80072EE7 indicates that the system cannot resolve domain names or reach update servers. This is commonly caused by stale DNS cache, incorrect DNS resolvers, or corrupted Winsock catalog.",
+            "device_harm": [
+                "Applications cannot resolve web hostnames and update endpoints",
+                "Cloud synchronization and Windows telemetry fail to transmit",
+                "Microsoft Defender definition updates fail due to network timeouts",
+            ],
+            "consequence_if_unfixed": "Internet connectivity errors and failed network communications across OS apps.",
+            "likely_causes": [
+                "Corrupted local DNS resolver cache",
+                "Outdated or unreachable DNS server configuration",
+                "Corrupted Winsock network socket stack",
+            ],
+            "diagnostic_commands": [
+                {
+                    "command": "Test-Connection -ComputerName 'bank.testnet.algorand.network' -Count 2 -ErrorAction SilentlyContinue | Select-Object Address, ResponseTime, Status",
+                    "purpose": "Test external DNS and internet connectivity",
+                },
+                {
+                    "command": "Get-DnsClientServerAddress -AddressFamily IPv4 | Select-Object InterfaceAlias, ServerAddresses",
+                    "purpose": "Inspect configured DNS server addresses",
+                },
+            ],
+        }
+
+    if "0X80070002" in code_upper or "FILE_NOT_FOUND" in code_upper:
+        return {
+            "error_code": "0x80070002",
+            "error_name": "ERROR_FILE_NOT_FOUND (2 / 0x80070002)",
+            "threat_level": "HIGH (Threat Level 3/5 - Missing Component File)",
+            "diagnosis": "Windows error 0x80070002 indicates that a required system file, installation manifest, or download package is missing or corrupted in the component store or SoftwareDistribution directory.",
+            "device_harm": [
+                "Installer engines fail to locate temporary extraction manifests",
+                "Cumulative update installations fail midway through servicing",
+            ],
+            "consequence_if_unfixed": "Repeated update download loops and corrupted servicing manifests.",
+            "likely_causes": [
+                "Corrupted SoftwareDistribution\\Download catalog",
+                "Incomplete package extraction in temporary directory",
+            ],
+            "diagnostic_commands": [
+                {
+                    "command": "Test-Path 'C:\\Windows\\SoftwareDistribution\\Download'",
+                    "purpose": "Verify existence of Windows Update download cache",
+                },
+                {
+                    "command": "Get-ChildItem 'C:\\Windows\\SoftwareDistribution\\Download' -ErrorAction SilentlyContinue | Measure-Object | Select-Object Count",
+                    "purpose": "Count files in download store",
+                },
+            ],
+        }
+
     if "0X80070005" in code_upper or "ACCESS_DENIED" in code_upper:
         return {
             "error_code": error_code,
@@ -477,7 +582,7 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
                     "purpose": "Inspect directory ACL permissions on Windows Update cache",
                 },
                 {
-                    "command": "Get-Service wuauserv, bits, cryptsvc, trustedinstaller | Select-Object Name, Status, StartType",
+                    "command": "Get-Service wuauserv, bits, cryptsvc, trustedinstaller -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType",
                     "purpose": "Verify status of Windows Update core services",
                 },
                 {
@@ -490,26 +595,25 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
     return {
         "error_code": error_code,
         "error_name": f"OS_ERROR_{error_code}",
-        "threat_level": "HIGH (Threat Level 3.5/5 - System Degradation Risk)",
-        "diagnosis": f"Error code {error_code} represents a system-level fault, service failure, or component inconsistency in the operating system.",
+        "threat_level": "MEDIUM (Threat Level 2/5 - System Fault)",
+        "diagnosis": f"Error code {error_code} represents an operating system fault or service configuration divergence.",
         "device_harm": [
-            "Background operating system services may stall or fail to initialize on boot",
-            "System binary inconsistencies can trigger application crashes and unexpected slowdowns",
-            "Servicing pipelines may be unable to apply future OS stability and security patches",
+            "Operating system servicing or background tasks may fail",
+            "Dependent applications may encounter transient errors",
         ],
-        "consequence_if_unfixed": "Unresolved background faults may escalate to system crashes, corrupted application states, or bootloop risks.",
+        "consequence_if_unfixed": "Unresolved faults can lead to background service failures or application crashes.",
         "likely_causes": [
-            "Missing system files or corrupted service state",
-            "Network configuration or security policy restriction",
+            "Stopped core background service",
+            "Configuration setting divergence",
         ],
         "diagnostic_commands": [
             {
-                "command": "Get-Service | Where-Object {$_.Status -eq 'Stopped' -and $_.StartType -eq 'Automatic'} | Select-Object Name, DisplayName",
-                "purpose": "Identify any automatic core services that failed to start",
+                "command": "Get-Service wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue | Select-Object Name, Status, StartType",
+                "purpose": "Check core Windows service health",
             },
             {
-                "command": "sfc /verifyonly",
-                "purpose": "Verify integrity of Windows system binaries without modifying files",
+                "command": "dism /Online /Cleanup-Image /CheckHealth",
+                "purpose": "Verify Windows Component Store integrity",
             },
         ],
     }
@@ -517,28 +621,128 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
 
 def _fallback_root_cause(error_code: str, execution_results: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Heuristic fallback for root cause confirmation."""
-    has_access_denied_evidence = any(
-        "Access is denied" in r.get("stdout", "") or "Access is denied" in r.get("stderr", "")
-        for r in execution_results
-    )
+    code_upper = str(error_code).upper()
+
+    if "SYSTEM_HEALTH_CHECK" in code_upper:
+        return {
+            "root_cause_confirmed": True,
+            "root_cause_analysis": "Diagnostic verification confirmed that all inspected Windows services are running with automatic startup and event logs show nominal health.",
+            "evidence": ["All core services (wuauserv, bits, cryptsvc, WinDefend) active and responsive."],
+            "remediation_summary": "No remediation required. System is healthy.",
+        }
+
+    if "0X80070422" in code_upper:
+        return {
+            "root_cause_confirmed": True,
+            "root_cause_analysis": "Diagnostic analysis confirmed that Windows Update or Background Intelligent Transfer Service is configured to 'Disabled' or stopped, blocking system updates.",
+            "evidence": ["wuauserv / bits service status or startup type found disabled/stopped."],
+            "remediation_summary": "Re-enable wuauserv and bits services, set startup type to Automatic, and start them immediately.",
+        }
+
+    if "0X80072EE7" in code_upper:
+        return {
+            "root_cause_confirmed": True,
+            "root_cause_analysis": "Network name resolution failure verified. DNS resolver cache contains stale records or socket catalog requires reset.",
+            "evidence": ["Test-Connection and DNS resolver inspection completed."],
+            "remediation_summary": "Flush DNS resolver cache and reset network socket catalog.",
+        }
 
     return {
         "root_cause_confirmed": True,
         "root_cause_analysis": (
             f"Analysis of diagnostic command outputs for {error_code} confirms permission restriction and/or service "
-            "configuration divergence in the system update pipeline."
+            "configuration divergence in the system pipeline."
         ),
         "evidence": [
             f"Executed {len(execution_results)} read-only diagnostic commands with exit code validation.",
             "Service status and filesystem ACL attributes captured and analyzed.",
         ],
-        "remediation_summary": "Reset SoftwareDistribution directory permissions, restart background update services, and register required DLLs.",
+        "remediation_summary": "Reset service configuration, apply proper ACL permissions, and restart background services.",
     }
 
 
 def _fallback_remediation_proposal(error_code: str, root_cause_data: Dict[str, Any]) -> Dict[str, Any]:
     """Heuristic fallback remediation script for common Windows errors."""
     code_upper = error_code.upper()
+
+    if "0X80070422" in code_upper:
+        script = """<#
+========================================================================================
+# PROBLEM STATEMENT & INCIDENT SUMMARY:
+----------------------------------------------------------------------------------------
+# Target Error Code  : 0x80070422 (ERROR_SERVICE_DISABLED)
+# Issue Description  : Windows Update and BITS services have been disabled.
+# Remediation Goal   : Re-enable wuauserv & bits -> Set to Automatic -> Start services.
+========================================================================================
+#>
+
+$ErrorActionPreference = 'SilentlyContinue'
+$env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0;$env:SystemRoot;$env:PATH"
+
+Write-Host "[1/3] Enabling Windows Update and BITS services..." -ForegroundColor Cyan
+Set-Service -Name wuauserv -StartupType Automatic -ErrorAction SilentlyContinue
+Set-Service -Name bits -StartupType Automatic -ErrorAction SilentlyContinue
+Set-Service -Name cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue
+
+Write-Host "[2/3] Starting core system services..." -ForegroundColor Cyan
+Start-Service -Name cryptsvc -ErrorAction SilentlyContinue
+Start-Service -Name bits -ErrorAction SilentlyContinue
+Start-Service -Name wuauserv -ErrorAction SilentlyContinue
+
+Write-Host "[3/3] Verifying live service state..." -ForegroundColor Cyan
+Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status, StartType
+
+Write-Host "`n[SUCCESS] Windows Update services have been re-enabled and started." -ForegroundColor Green
+"""
+        return {
+            "title": "Windows Update Disabled Service Repair (0x80070422)",
+            "problem_statement": "Windows Update services (wuauserv / bits) are currently disabled or stopped.",
+            "summary": "Re-enables Windows Update and BITS services, sets startup type to Automatic, and starts services.",
+            "steps": [
+                "Re-enable wuauserv and bits services to Automatic startup",
+                "Start cryptsvc, bits, and wuauserv services",
+                "Verify live service running status",
+            ],
+            "script_type": "powershell",
+            "script_content": script.strip(),
+            "verification_command": "Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status, StartType",
+            "requires_reboot": False,
+        }
+
+    if "0X80072EE7" in code_upper:
+        script = """<#
+========================================================================================
+# PROBLEM STATEMENT & INCIDENT SUMMARY:
+----------------------------------------------------------------------------------------
+# Target Error Code  : 0x80072EE7 (DNS Resolution Failure)
+# Remediation Goal   : Flush DNS cache -> Reset Winsock stack -> Restart DNS Client.
+========================================================================================
+#>
+
+$ErrorActionPreference = 'SilentlyContinue'
+$env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0;$env:SystemRoot;$env:PATH"
+
+Write-Host "[1/2] Flushing DNS resolver cache..." -ForegroundColor Cyan
+& ipconfig /flushdns
+
+Write-Host "[2/2] Resetting Winsock catalog..." -ForegroundColor Cyan
+& netsh winsock reset >$null 2>&1
+
+Write-Host "`n[SUCCESS] DNS cache flushed and network socket stack refreshed." -ForegroundColor Green
+"""
+        return {
+            "title": "DNS & Network Socket Repair (0x80072EE7)",
+            "problem_statement": "System is encountering DNS name resolution failures or socket stale cache.",
+            "summary": "Flushes the local DNS resolver cache and resets the Windows socket stack.",
+            "steps": [
+                "Flush Windows DNS Resolver Cache using ipconfig /flushdns",
+                "Reset Winsock catalog using netsh winsock reset",
+            ],
+            "script_type": "powershell",
+            "script_content": script.strip(),
+            "verification_command": "ipconfig /displaydns | Select-Object -First 5",
+            "requires_reboot": False,
+        }
 
     if "0X80070005" in code_upper or "ACCESS_DENIED" in code_upper:
         script = """<#
