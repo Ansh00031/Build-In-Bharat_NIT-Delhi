@@ -232,9 +232,9 @@ if "%CHOICE%"=="3" (
 if "%CHOICE%"=="4" (
     echo.
     echo [*] Injecting Rogue Adware Startup Registry Hook...
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /t REG_SZ /d "cmd.exe /c start https://adware-spam-demo.com" /f
+    powershell -Command "Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -Value 'cmd.exe /c start https://adware-spam-demo.com' -Force; Write-Host '[✓] Rogue adware hook injected into Startup Registry!' -ForegroundColor Red"
     echo.
-    echo [✓] Rogue adware hook injected into Startup Registry!
+    echo [✓] Rogue adware hook is now ACTIVE!
     echo [>] Run 'fix adware' to watch the agent detect and purge the adware hook!
     echo.
     pause
@@ -244,8 +244,7 @@ if "%CHOICE%"=="4" (
 if "%CHOICE%"=="5" (
     echo.
     echo [*] Restoring default Windows system state...
-    powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Write-Host '[✓] All services restored to Automatic & Running!' -ForegroundColor Green"
-    reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /f >nul 2>&1
+    powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue; Write-Host '[✓] All services restored to Automatic & Running!' -ForegroundColor Green"
     echo.
     echo [✓] All test errors removed. PC is 100% clean!
     echo.
@@ -257,6 +256,9 @@ if "%CHOICE%"=="5" (
 
         if not cleanup_path.exists():
             cleanup_script = r"""@echo off
+setlocal enabledelayedexpansion
+set "PATH=%PATH%;C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows;%SystemRoot%\System32"
+
 title Emergency System Restorer - Debug thugs
 color 0A
 echo ===============================================================================
@@ -267,7 +269,7 @@ powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Aut
 echo [*] Flushing DNS cache and resetting Winsock...
 ipconfig /flushdns >nul 2>&1
 echo [*] Cleaning demo adware hooks...
-reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /f >nul 2>&1
+powershell -Command "Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue"
 echo.
 echo ===============================================================================
 echo [✓] System is 100% clean and restored to standard Windows defaults!
@@ -275,6 +277,15 @@ echo ===========================================================================
 pause
 """
             cleanup_path.write_text(cleanup_script.strip(), encoding="utf-8")
+
+        # Copy to user directory and WindowsApps for immediate global execution
+        for dest_folder in [Path.home(), Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps"]:
+            try:
+                if dest_folder.exists():
+                    (dest_folder / "inject_test_error.bat").write_text(inject_path.read_text(encoding="utf-8"), encoding="utf-8")
+                    (dest_folder / "cleanup_test_error.bat").write_text(cleanup_path.read_text(encoding="utf-8"), encoding="utf-8")
+            except Exception:
+                pass
     except Exception:
         pass
 

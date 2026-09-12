@@ -1,4 +1,7 @@
 @echo off
+setlocal enabledelayedexpansion
+set "PATH=%PATH%;C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows;%SystemRoot%\System32"
+
 title Emergency System Restorer - Debug thugs
 color 0A
 echo ===============================================================================
@@ -9,7 +12,7 @@ powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Aut
 echo [*] Flushing DNS cache and resetting Winsock...
 ipconfig /flushdns >nul 2>&1
 echo [*] Cleaning demo adware hooks...
-reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /f >nul 2>&1
+powershell -Command "Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue"
 echo.
 echo ===============================================================================
 echo [✓] System is 100% clean and restored to standard Windows defaults!

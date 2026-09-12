@@ -1,4 +1,7 @@
 @echo off
+setlocal enabledelayedexpansion
+set "PATH=%PATH%;C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows;%SystemRoot%\System32"
+
 title Presentation Demo Error Injector - Debug thugs
 color 0C
 echo ===============================================================================
@@ -52,9 +55,9 @@ if "%CHOICE%"=="3" (
 if "%CHOICE%"=="4" (
     echo.
     echo [*] Injecting Rogue Adware Startup Registry Hook...
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /t REG_SZ /d "cmd.exe /c start https://adware-spam-demo.com" /f
+    powershell -Command "Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -Value 'cmd.exe /c start https://adware-spam-demo.com' -Force; Write-Host '[✓] Rogue adware hook injected into Startup Registry!' -ForegroundColor Red"
     echo.
-    echo [✓] Rogue adware hook injected into Startup Registry!
+    echo [✓] Rogue adware hook is now ACTIVE!
     echo [>] Run 'fix adware' to watch the agent detect and purge the adware hook!
     echo.
     pause
@@ -64,8 +67,7 @@ if "%CHOICE%"=="4" (
 if "%CHOICE%"=="5" (
     echo.
     echo [*] Restoring default Windows system state...
-    powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Write-Host '[✓] All services restored to Automatic & Running!' -ForegroundColor Green"
-    reg delete "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "SuspiciousAdwareHookDemo" /f >nul 2>&1
+    powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue; Write-Host '[✓] All services restored to Automatic & Running!' -ForegroundColor Green"
     echo.
     echo [✓] All test errors removed. PC is 100% clean!
     echo.
