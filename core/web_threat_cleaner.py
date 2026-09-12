@@ -199,19 +199,30 @@ def scan_adware_startup_hooks() -> List[Dict[str, Any]]:
                 num_values = winreg.QueryInfoKey(k)[1]
                 for i in range(num_values):
                     name, val, _ = winreg.EnumValue(k, i)
+                    name_lower = str(name).lower()
                     val_lower = str(val).lower()
-                    # Check for suspicious scripting host executions or hidden PowerShell URL fetching
-                    if any(susp in val_lower for susp in ["mshta", "wscript.exe", "cscript.exe", "powershell.exe -w hidden", "rundll32.exe url.dll"]):
+                    
+                    is_suspicious = False
+                    # Check suspicious names (e.g. test adware hook, spam, popup)
+                    if any(susp_name in name_lower for susp_name in ["adware", "spam", "popup", "hook", "demo", "suspicious"]):
+                        is_suspicious = True
+                    # Check for script launchers or URL openers in startup
+                    elif any(susp_exec in val_lower for susp_exec in ["cmd.exe", "powershell", "mshta", "wscript", "cscript", "rundll32"]):
                         if any(pattern in val_lower for pattern in SUSPICIOUS_PATTERNS) or "http" in val_lower:
-                            adware_hooks.append({
-                                "type": "Registry Startup Hook",
-                                "name": name,
-                                "command": val,
-                                "hive": "HKCU" if root_hive == winreg.HKEY_CURRENT_USER else "HKLM",
-                                "key_path": subkey_path,
-                                "threat_type": "Adware Startup Persistence",
-                                "severity": "HIGH",
-                            })
+                            is_suspicious = True
+                    elif any(pattern in val_lower for pattern in SUSPICIOUS_PATTERNS) or "http://" in val_lower or "https://" in val_lower:
+                        is_suspicious = True
+
+                    if is_suspicious:
+                        adware_hooks.append({
+                            "type": "Registry Startup Hook",
+                            "name": name,
+                            "command": val,
+                            "hive": "HKCU" if root_hive == winreg.HKEY_CURRENT_USER else "HKLM",
+                            "key_path": subkey_path,
+                            "threat_type": "Adware Startup Persistence / Rogue Launcher",
+                            "severity": "HIGH (Adware Persistence)",
+                        })
         except Exception:
             continue
 

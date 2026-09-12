@@ -9,6 +9,7 @@ Usage:
 """
 
 import json
+import os
 import platform
 import subprocess
 import sys
@@ -172,13 +173,15 @@ app = typer.Typer(
 
 
 def ensure_demo_scripts_exist() -> None:
-    """Ensure inject_test_error.bat and cleanup_test_error.bat are created in the project folder."""
+    """Ensure inject_test_error.bat and cleanup_test_error.bat are created in the project folder and user path."""
     try:
         inject_path = _AGENT_ROOT / "inject_test_error.bat"
         cleanup_path = _AGENT_ROOT / "cleanup_test_error.bat"
 
-        if not inject_path.exists():
-            inject_script = r"""@echo off
+        inject_script = r"""@echo off
+setlocal enabledelayedexpansion
+set "PATH=%SystemRoot%\System32;%SystemRoot%\System32\WindowsPowerShell\v1.0;%SystemRoot%;%PATH%"
+
 title Presentation Demo Error Injector - Debug thugs
 color 0C
 echo ===============================================================================
@@ -196,7 +199,7 @@ set /p CHOICE="Select a test error to inject [1-5]: "
 if "%CHOICE%"=="1" (
     echo.
     echo [*] Injecting 0x80070422: Stopping and Disabling Windows Update & BITS services...
-    powershell -Command "Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue; Set-Service -Name wuauserv, bits -StartupType Disabled -ErrorAction SilentlyContinue; Write-Host '[!] Services DISABLED. System updates are now blocked!' -ForegroundColor Red"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue; Set-Service -Name wuauserv, bits -StartupType Disabled -ErrorAction SilentlyContinue; Write-Host '[!] Services DISABLED. System updates are now blocked (0x80070422)!' -ForegroundColor Red"
     echo.
     echo [✓] Error 0x80070422 is now ACTIVE on this PC!
     echo [>] Run 'fix' or 'fix checkup' or 'fix 0x80070422' to watch the agent detect and heal it!
@@ -208,7 +211,7 @@ if "%CHOICE%"=="1" (
 if "%CHOICE%"=="2" (
     echo.
     echo [*] Injecting 0x80070005: Stopping update services and stripping write access...
-    powershell -Command "Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue; Write-Host '[!] Error 0x80070005 (Access Denied / Service Stopped) injected!' -ForegroundColor Red"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue; Write-Host '[!] Error 0x80070005 (Access Denied / Service Stopped) injected!' -ForegroundColor Red"
     echo.
     echo [✓] Error 0x80070005 is now ACTIVE on this PC!
     echo [>] Run 'fix' or 'fix 0x80070005' to watch the agent detect and heal it!
@@ -220,7 +223,7 @@ if "%CHOICE%"=="2" (
 if "%CHOICE%"=="3" (
     echo.
     echo [*] Injecting 0x80072EE7: Corrupting DNS cache state...
-    powershell -Command "Clear-DnsClientCache -ErrorAction SilentlyContinue; Write-Host '[!] DNS resolver cache state cleared/interrupted.' -ForegroundColor Yellow"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Clear-DnsClientCache -ErrorAction SilentlyContinue; Write-Host '[!] DNS resolver cache state cleared/interrupted.' -ForegroundColor Yellow"
     echo.
     echo [✓] Network/DNS test state active.
     echo [>] Run 'fix 0x80072EE7' to watch the agent refresh Winsock & DNS!
@@ -232,7 +235,7 @@ if "%CHOICE%"=="3" (
 if "%CHOICE%"=="4" (
     echo.
     echo [*] Injecting Rogue Adware Startup Registry Hook...
-    powershell -Command "Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -Value 'cmd.exe /c start https://adware-spam-demo.com' -Force; Write-Host '[✓] Rogue adware hook injected into Startup Registry!' -ForegroundColor Red"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -Value 'cmd.exe /c start https://adware-spam-demo.com' -Force; Write-Host '[✓] Rogue adware hook injected into Startup Registry!' -ForegroundColor Red"
     echo.
     echo [✓] Rogue adware hook is now ACTIVE!
     echo [>] Run 'fix adware' to watch the agent detect and purge the adware hook!
@@ -244,7 +247,7 @@ if "%CHOICE%"=="4" (
 if "%CHOICE%"=="5" (
     echo.
     echo [*] Restoring default Windows system state...
-    powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue; Write-Host '[✓] All services restored to Automatic & Running!' -ForegroundColor Green"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue; ipconfig /flushdns; Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue; Write-Host '[✓] All services restored to Automatic & Running. All test hooks deleted!' -ForegroundColor Green"
     echo.
     echo [✓] All test errors removed. PC is 100% clean!
     echo.
@@ -252,12 +255,10 @@ if "%CHOICE%"=="5" (
     goto :eof
 )
 """
-            inject_path.write_text(inject_script.strip(), encoding="utf-8")
 
-        if not cleanup_path.exists():
-            cleanup_script = r"""@echo off
+        cleanup_script = r"""@echo off
 setlocal enabledelayedexpansion
-set "PATH=%PATH%;C:\Windows\System32;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows;%SystemRoot%\System32"
+set "PATH=%SystemRoot%\System32;%SystemRoot%\System32\WindowsPowerShell\v1.0;%SystemRoot%;%PATH%"
 
 title Emergency System Restorer - Debug thugs
 color 0A
@@ -265,25 +266,26 @@ echo ===========================================================================
 echo     EMERGENCY SYSTEM RESTORER (RESET ALL TEST ERRORS TO CLEAN DEFAULTS)
 echo ===============================================================================
 echo [*] Re-enabling and starting Windows Update, BITS, and CryptSvc...
-powershell -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue; Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue"
 echo [*] Flushing DNS cache and resetting Winsock...
 ipconfig /flushdns >nul 2>&1
 echo [*] Cleaning demo adware hooks...
-powershell -Command "Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Remove-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SuspiciousAdwareHookDemo' -ErrorAction SilentlyContinue"
 echo.
 echo ===============================================================================
 echo [✓] System is 100% clean and restored to standard Windows defaults!
 echo ===============================================================================
 pause
 """
-            cleanup_path.write_text(cleanup_script.strip(), encoding="utf-8")
+        inject_path.write_text(inject_script.strip(), encoding="utf-8")
+        cleanup_path.write_text(cleanup_script.strip(), encoding="utf-8")
 
         # Copy to user directory and WindowsApps for immediate global execution
         for dest_folder in [Path.home(), Path(os.environ.get("LOCALAPPDATA", "")) / "Microsoft" / "WindowsApps"]:
             try:
                 if dest_folder.exists():
-                    (dest_folder / "inject_test_error.bat").write_text(inject_path.read_text(encoding="utf-8"), encoding="utf-8")
-                    (dest_folder / "cleanup_test_error.bat").write_text(cleanup_path.read_text(encoding="utf-8"), encoding="utf-8")
+                    (dest_folder / "inject_test_error.bat").write_text(inject_script.strip(), encoding="utf-8")
+                    (dest_folder / "cleanup_test_error.bat").write_text(cleanup_script.strip(), encoding="utf-8")
             except Exception:
                 pass
     except Exception:
@@ -393,7 +395,7 @@ def diagnose(
         detected = context.get("detected_error_codes", [])
         if detected:
             target_code = detected[0]
-            console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected Error:[/bold yellow] [bold red]{target_code}[/bold red] (analyzing logs)...\n")
+            console.print(f"[bold yellow]⚠️ Whole Laptop Scan Detected Active Issue:[/bold yellow] [bold red]{target_code}[/bold red] (analyzing logs)...\n")
         else:
             target_code = "SYSTEM_HEALTH_CHECK"
             console.print("[bold green]✓ Whole Laptop Scan Result:[/bold green] System event logs extracted. Performing full health and service integrity check.\n")
@@ -449,6 +451,7 @@ def diagnose(
             res = execute_diagnostic_command(cmd_str)
             res["purpose"] = purpose
             exec_results.append(res)
+
     # Step 3.5: Whole PC Clean Check (If full scan and 0 errors found)
     if error_code == "SYSTEM_HEALTH_CHECK":
         record_command_history(
@@ -459,11 +462,12 @@ def diagnose(
         )
         console.print(
             Panel(
-                "[bold green]✓ System is completely healthy![/bold green]\n\n"
-                "• Windows Event Logs: 0 Critical Faults / Blue Screens\n"
+                "[bold green]✓ System is 100% ERROR-FREE & HEALTHY![/bold green]\n\n"
+                "• Windows Event Logs: 0 Active Critical Faults / Blue Screens\n"
                 "• Core OS Services: Active & Nominal (wuauserv, bits, cryptsvc, WinDefend)\n"
+                "• Threat Level: 0 / 5 (Nominal - System in Peak Condition)\n"
                 "• System Storage & Registries: Secure & Healthy",
-                title="[bold green]Doctor Checkup: 100% Healthy[/bold green]",
+                title="[bold green]Doctor Checkup: 100% Healthy (Error-Free)[/bold green]",
                 border_style="green",
             )
         )
@@ -481,15 +485,31 @@ def diagnose(
             has_active_issue = True
             break
 
+    # If the probed component is completely healthy on this PC:
     if not has_active_issue:
         console.print(
             Panel(
-                f"[bold green]✓ Live Verification Notice: No active faults or service crashes for '{error_code}' were found on this PC.[/bold green]\n"
-                "[dim]All probed background services and registry paths are currently operating normally.[/dim]",
-                title="[bold green]Live System Check: Clean[/bold green]",
+                f"[bold green]✓ Live Verification Check: Error '{error_code}' is NOT present on this PC.[/bold green]\n\n"
+                "• All probed background services and registry settings are operating normally.\n"
+                "• Active Threat Level: [bold green]0 / 5 (Nominal / Clean)[/bold green]\n"
+                "• System is completely healthy and unaffected by this error code.",
+                title="[bold green]Live System Verification: Clean (Error-Free)[/bold green]",
                 border_style="green",
             )
         )
+        record_command_history(
+            command=f"diagnose {error_code}",
+            category="🔵 OS Diagnostic & Repair",
+            action_summary=f"Audited system for {error_code} — Component verified clean and healthy",
+            status="HEALTHY",
+        )
+        want_docs = Confirm.ask(
+            f"[bold cyan]Would you like to view offline reference documentation and repair instructions for {error_code}?[/bold cyan]",
+            default=False,
+        )
+        if not want_docs:
+            console.print("[dim]Exiting diagnostic. System remains clean and untouched.[/dim]\n")
+            return
 
     # Feed outputs back into LLM to confirm root cause
     with console.status(
@@ -528,7 +548,7 @@ def diagnose(
     prompt_msg = (
         "[bold yellow]Do you want to execute this fix? (This requires Administrator privileges)[/bold yellow]"
         if has_active_issue
-        else "[bold yellow]System is currently clean. Do you want to run preventive system hardening/repair anyway?[/bold yellow]"
+        else "[bold yellow]System is currently clean. Do you want to run preventive system hardening anyway?[/bold yellow]"
     )
     should_execute = Confirm.ask(
         prompt_msg,

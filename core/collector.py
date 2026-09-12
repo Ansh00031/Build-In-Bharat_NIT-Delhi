@@ -181,25 +181,65 @@ def query_linux_syslog(max_events: int = 50) -> Dict[str, Any]:
 
 
 def detect_system_errors(context: Dict[str, Any]) -> List[str]:
-    """Scan collected event logs and detect explicit error codes, hex codes, or failed components."""
+    """Scan live services and collected event logs to detect active genuine Windows error codes."""
     import re
     detected: List[str] = []
+
+    # 1. Proactive live service health check (detects injected service disable/stop faults)
+    if platform.system() == "Windows":
+        try:
+            ps_exe = find_powershell_executable()
+            svc_check = subprocess.run(
+                [
+                    ps_exe,
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    "Get-Service -Name wuauserv, bits -ErrorAction SilentlyContinue | Select-Object -Property Name, Status, StartType | ConvertTo-Json -Compress",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                env=get_system_env(),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if svc_check.stdout and svc_check.stdout.strip():
+                try:
+                    svc_list = json.loads(svc_check.stdout.strip())
+                    if isinstance(svc_list, dict):
+                        svc_list = [svc_list]
+                    for s in svc_list:
+                        start_type = str(s.get("StartType", "")).lower()
+                        status = str(s.get("Status", "")).lower()
+                        # If service is explicitly disabled -> 0x80070422
+                        if start_type in ["disabled", "4"] or "disabled" in str(s):
+                            if "0x80070422" not in detected:
+                                detected.append("0x80070422")
+                        # If service is stopped (and not supposed to be) -> 0x80070005 / Stopped
+                        elif status in ["stopped", "1"] and start_type in ["automatic", "2", "3"]:
+                            if "0x80070005" not in detected and "0x80070422" not in detected:
+                                detected.append("0x80070005")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    # 2. Strict known Windows HRESULT / NTSTATUS error patterns from recent event logs
     events = context.get("event_logs", [])
+    error_pattern = re.compile(
+        r"\b0x(8007[0-9a-fA-F]{4}|8024[0-9a-fA-F]{4}|800F[0-9a-fA-F]{4}|C0000[0-9a-fA-F]{3}|80004[0-9a-fA-F]{3}|80072[0-9a-fA-F]{3})\b",
+        re.IGNORECASE,
+    )
 
     for evt in events:
         msg = str(evt.get("Message", ""))
-        # Search for hex error codes like 0x80070005 or 0x80240020
-        hex_matches = re.findall(r"0x[0-9a-fA-F]{8}", msg)
-        for h in hex_matches:
-            if h not in detected:
-                detected.append(h)
-
-        # Search for Windows Update errors (e.g. 80070005)
-        std_matches = re.findall(r"\b(?:0x)?[89][0-9A-Fa-f]{7}\b", msg)
-        for s in std_matches:
-            norm = s if s.startswith("0x") else f"0x{s}"
-            if norm not in detected:
-                detected.append(norm)
+        matches = error_pattern.findall(msg)
+        for m in matches:
+            code = f"0x{m.upper()}"
+            if code not in detected:
+                detected.append(code)
 
     return detected
 
