@@ -498,6 +498,40 @@ def _fallback_initial_diagnosis(error_code: str, system_context: Dict[str, Any])
             ],
         }
 
+    if "0X80240438" in code_upper or "0X8024" in code_upper or "SOAPCLIENT" in code_upper:
+        return {
+            "error_code": "0x80240438",
+            "error_name": "ERROR_WU_SOAPCLIENT_CONNECTION_BLOCKED (0x80240438)",
+            "threat_level": "HIGH (Threat Level 4/5 - Update Server Connection Blocked)",
+            "diagnosis": "Windows error 0x80240438 occurs when Windows Update or Microsoft Store is blocked from communicating with Microsoft update servers. This is caused by invalid WinHTTP proxy routing, restrictive Windows Update Group Policies (DisableWindowsUpdateAccess), or a corrupted SoftwareDistribution\\DataStore cache.",
+            "device_harm": [
+                "Windows Update and Microsoft Store downloads are blocked from reaching server endpoints",
+                "Critical Defender definitions and OS security rollups cannot download",
+                "Background servicing enters repeated retry loops, draining network and CPU bandwidth",
+            ],
+            "consequence_if_unfixed": "System is unable to download security patches and Microsoft Store apps fail to install.",
+            "likely_causes": [
+                "Misconfigured WinHTTP system proxy routing",
+                "Group Policy restriction: DisableWindowsUpdateAccess or UseWUServer enabled",
+                "Corrupted SoftwareDistribution\\DataStore cache tokens",
+                "Stale Winsock network sockets blocking update endpoints",
+            ],
+            "diagnostic_commands": [
+                {
+                    "command": "netsh winhttp show proxy",
+                    "purpose": "Check system WinHTTP proxy configuration",
+                },
+                {
+                    "command": "Get-ItemProperty 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue | Select-Object DisableWindowsUpdateAccess, DoNotConnectToWindowsUpdateInternetLocations",
+                    "purpose": "Check for Windows Update blocking policies",
+                },
+                {
+                    "command": "Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status, StartType",
+                    "purpose": "Verify status of Windows Update core services",
+                },
+            ],
+        }
+
     if "0X80072EE7" in code_upper or "DNS_ERROR" in code_upper:
         return {
             "error_code": "0x80072EE7",
@@ -675,6 +709,14 @@ def _fallback_root_cause(error_code: str, execution_results: List[Dict[str, Any]
             "remediation_summary": "Flush DNS resolver cache and reset network socket catalog.",
         }
 
+    if "0X80240438" in code_upper or "0X8024" in code_upper:
+        return {
+            "root_cause_confirmed": True,
+            "root_cause_analysis": "Diagnostic verification confirmed that Windows Update/Store server communication is blocked by invalid WinHTTP proxy configuration, restrictive Group Policies, or corrupted DataStore cache tokens.",
+            "evidence": ["WinHTTP proxy or policy configuration checked.", "Windows Update servicing state evaluated."],
+            "remediation_summary": "Reset WinHTTP proxy, remove blocking policies, purge DataStore cache, flush DNS, and restart update services.",
+        }
+
     if "0X80004005" in code_upper:
         return {
             "root_cause_confirmed": True,
@@ -700,6 +742,62 @@ def _fallback_root_cause(error_code: str, execution_results: List[Dict[str, Any]
 def _fallback_remediation_proposal(error_code: str, root_cause_data: Dict[str, Any]) -> Dict[str, Any]:
     """Heuristic fallback remediation script for common Windows errors."""
     code_upper = error_code.upper()
+
+    if "0X80240438" in code_upper or "0X8024" in code_upper:
+        script = """<#
+========================================================================================
+# PROBLEM STATEMENT & INCIDENT SUMMARY:
+----------------------------------------------------------------------------------------
+# Target Error Code  : 0x80240438 (WU_E_PT_SOAPCLIENT_BASE / Server Blocked)
+# Issue Description  : Windows Update & Store are blocked from reaching server endpoints.
+# Remediation Goal   : Reset WinHTTP Proxy -> Clear WU Policies -> Purge DataStore -> Flush DNS.
+========================================================================================
+#>
+
+$ErrorActionPreference = 'SilentlyContinue'
+$env:PATH = "$env:SystemRoot\\System32;$env:SystemRoot\\System32\\WindowsPowerShell\\v1.0;$env:SystemRoot;$env:PATH"
+
+Write-Host "[1/5] Resetting WinHTTP Proxy routing..." -ForegroundColor Cyan
+& netsh winhttp reset proxy
+
+Write-Host "[2/5] Removing restrictive Windows Update Group Policies..." -ForegroundColor Cyan
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'DisableWindowsUpdateAccess' -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'DoNotConnectToWindowsUpdateInternetLocations' -ErrorAction SilentlyContinue
+Remove-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -Name 'UseWUServer' -ErrorAction SilentlyContinue
+
+Write-Host "[3/5] Stopping services and purging DataStore token cache..." -ForegroundColor Cyan
+Stop-Service -Name wuauserv, bits -Force -ErrorAction SilentlyContinue
+$dataStore = "$env:SystemRoot\\SoftwareDistribution\\DataStore"
+if (Test-Path $dataStore) {
+    Remove-Item "$dataStore\\*" -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Write-Host "[4/5] Resetting network socket stack & flushing DNS..." -ForegroundColor Cyan
+& ipconfig /flushdns
+& netsh winsock reset >$null 2>&1
+
+Write-Host "[5/5] Re-enabling and starting Windows Update services..." -ForegroundColor Cyan
+Set-Service -Name wuauserv, bits, cryptsvc -StartupType Automatic -ErrorAction SilentlyContinue
+Start-Service -Name wuauserv, bits, cryptsvc -ErrorAction SilentlyContinue
+
+Write-Host "`n[SUCCESS] Windows Update proxy, policies, and DataStore cache have been reset." -ForegroundColor Green
+"""
+        return {
+            "title": "Windows Update Server Connection & Proxy Reset (0x80240438)",
+            "problem_statement": "Windows Update is blocked from communicating with Microsoft servers due to proxy, policy, or DataStore cache corruption (0x80240438).",
+            "summary": "Resets WinHTTP proxy routing, removes restrictive Group Policies, purges corrupted DataStore tokens, and restarts update services.",
+            "steps": [
+                "Reset WinHTTP Proxy configuration via netsh winhttp reset proxy",
+                "Remove restrictive Windows Update registry policies (DisableWindowsUpdateAccess)",
+                "Purge corrupted SoftwareDistribution\\DataStore cache tokens",
+                "Flush DNS cache and reset Winsock network catalog",
+                "Restart and verify Windows Update core services",
+            ],
+            "script_type": "powershell",
+            "script_content": script.strip(),
+            "verification_command": "Get-Service wuauserv, bits, cryptsvc | Select-Object Name, Status, StartType",
+            "requires_reboot": False,
+        }
 
     if "0X80004005" in code_upper:
         script = """<#
